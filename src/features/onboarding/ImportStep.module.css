@@ -1,0 +1,61 @@
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.heading {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.optionCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  background-color: var(--color-surface-0);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--duration-fast) var(--easing-default),
+    background-color var(--duration-fast) var(--easing-default);
+  color: var(--color-text-primary);
+}
+
+.optionCard:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface-2);
+}
+
+.optionCard:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.optionLabel {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.optionNote {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

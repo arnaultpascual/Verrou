@@ -1,0 +1,9 @@
+---
+source: src-tauri/src/commands/entries.rs
+assertion_line: 1495
+expression: dto
+---
+{
+  "total": 10,
+  "remaining": 7
+}

@@ -1,0 +1,14 @@
+---
+source: src-tauri/src/commands/import.rs
+assertion_line: 356
+expression: dto
+---
+{
+  "imported": 3,
+  "skipped": 2,
+  "importedIds": [
+    "id-1",
+    "id-2",
+    "id-3"
+  ]
+}

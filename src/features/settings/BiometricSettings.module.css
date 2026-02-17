@@ -1,0 +1,149 @@
+.biometricSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-surface-1);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.status {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.statusEnabled {
+  color: var(--color-success);
+}
+
+/* Kobalte Switch styling */
+.switchRoot {
+  display: inline-flex;
+  align-items: center;
+}
+
+.switchControl {
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  background: var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+.switchControl[data-checked] {
+  background: var(--color-primary);
+}
+
+.switchControl[data-disabled] {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.switchThumb {
+  width: 16px;
+  height: 16px;
+  background: var(--color-surface-0);
+  border-radius: 50%;
+  transition: transform var(--duration-fast) var(--easing-default);
+}
+
+.switchThumb[data-checked] {
+  transform: translateX(16px);
+}
+
+/* Unavailable state */
+.unavailableMessage {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+/* Re-auth flow inline */
+.reAuthFlow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: var(--border-default);
+}
+
+.reAuthHeading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.reAuthDescription {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: var(--spacing-md);
+}
+
+.formActions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+}
+
+.error {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.operationStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* Shake animation for errors */
+@keyframes biometricShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+
+.shake {
+  animation: biometricShake var(--duration-normal) var(--easing-default);
+}

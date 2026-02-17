@@ -1,0 +1,19 @@
+---
+source: src-tauri/src/commands/entries.rs
+assertion_line: 1417
+expression: dto
+---
+{
+  "codes": [
+    "ABCD-1234",
+    "EFGH-5678",
+    "IJKL-9012"
+  ],
+  "used": [
+    1
+  ],
+  "totalCodes": 3,
+  "remainingCodes": 2,
+  "linkedEntryId": "totp-uuid-123",
+  "hasLinkedEntry": true
+}

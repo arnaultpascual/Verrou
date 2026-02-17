@@ -1,0 +1,113 @@
+/* SeedViewer — masked/revealed seed phrase display */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Masked State ── */
+
+.maskedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  align-items: center;
+}
+
+.maskedGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.maskedWord {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-sm);
+}
+
+.maskedDots {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+/* ── Revealed State ── */
+
+.revealedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.timerBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.wordGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.wordCell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+}
+
+.wordNumber {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  min-width: 1.5em;
+  text-align: right;
+  font-weight: var(--font-weight-medium);
+}
+
+.wordText {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+}
+
+/* ── Passphrase Indicator ── */
+
+.passphraseIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-type-seed);
+}
+
+/* ── Actions ── */
+
+.revealActions {
+  display: flex;
+  justify-content: center;
+}
+
+.revealedActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}

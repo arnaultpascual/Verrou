@@ -1,0 +1,52 @@
+/* TypeBadge — entry type indicator with icon + label */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: calc(var(--spacing-xs) / 2) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* ── Type-specific accent colors (12% opacity bg + accent text) ── */
+
+.badge[data-type="totp"],
+.badge[data-type="hotp"] {
+  color: var(--color-type-totp);
+  background: color-mix(in srgb, var(--color-type-totp) 12%, transparent);
+}
+
+.badge[data-type="seed_phrase"] {
+  color: var(--color-type-seed);
+  background: color-mix(in srgb, var(--color-type-seed) 12%, transparent);
+}
+
+.badge[data-type="recovery_code"] {
+  color: var(--color-type-recovery);
+  background: color-mix(in srgb, var(--color-type-recovery) 12%, transparent);
+}
+
+.badge[data-type="secure_note"] {
+  color: var(--color-type-note);
+  background: color-mix(in srgb, var(--color-type-note) 12%, transparent);
+}
+
+.badge[data-type="credential"] {
+  color: var(--color-type-credential);
+  background: color-mix(in srgb, var(--color-type-credential) 12%, transparent);
+}
+
+/* Fallback for unknown types */
+.badge:not([data-type="totp"]):not([data-type="hotp"]):not([data-type="seed_phrase"]):not([data-type="recovery_code"]):not([data-type="secure_note"]):not([data-type="credential"]) {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+}
+
+.label {
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}

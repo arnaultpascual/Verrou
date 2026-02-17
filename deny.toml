@@ -1,0 +1,77 @@
+# cargo-deny configuration for VERROU (v0.19+ format)
+# Enforces license compliance, bans network crates, checks advisories
+
+[advisories]
+version = 2
+# Ignore unmaintained advisories for Tauri/system transitive dependencies we can't control
+ignore = [
+    "RUSTSEC-2021-0139",  # ansi_term unmaintained
+    "RUSTSEC-2024-0370",  # unic-* unmaintained
+    "RUSTSEC-2024-0375",  # atty unmaintained
+    "RUSTSEC-2024-0386",  # gtk3-rs unmaintained (Tauri dep on Linux)
+    "RUSTSEC-2024-0388",  # proc-macro-error unmaintained
+    "RUSTSEC-2024-0411",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0412",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0413",  # fxhash unmaintained
+    "RUSTSEC-2024-0414",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0415",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0416",  # proc-macro-error unmaintained
+    "RUSTSEC-2024-0417",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0418",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0419",  # gtk-rs unmaintained
+    "RUSTSEC-2024-0420",  # gtk-rs unmaintained
+    "RUSTSEC-2025-0057",  # unic-* unmaintained
+    "RUSTSEC-2025-0075",  # unic-* unmaintained
+    "RUSTSEC-2025-0080",  # unic-* unmaintained
+    "RUSTSEC-2025-0081",  # unic-* unmaintained
+    "RUSTSEC-2025-0098",  # gtk-rs unmaintained
+    "RUSTSEC-2025-0100",  # gtk-rs unmaintained
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "BSL-1.0",
+    "OpenSSL",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "CC0-1.0",
+]
+confidence-threshold = 0.8
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+# Zero-network enforcement: ban network crates in crypto-core and vault.
+# hyper/reqwest are Tauri transitive deps (dialog plugin on some platforms).
+# We skip banning them here since Tauri requires them internally.
+# Actual enforcement: CI cargo-tree grep on crypto-core and vault crates only.
+deny = [
+    { crate = "curl", wrappers = [] },
+    { crate = "async-std", wrappers = [] },
+    { crate = "surf", wrappers = [] },
+    { crate = "ureq", wrappers = [] },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

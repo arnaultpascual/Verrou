@@ -1,0 +1,26 @@
+.backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--color-surface-0);
+  padding: var(--spacing-xl);
+}
+
+.card {
+  width: 480px;
+  max-width: 100%;
+  background-color: var(--color-surface-1);
+  border: var(--border-default);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.navigation {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: var(--border-subtle);
+}

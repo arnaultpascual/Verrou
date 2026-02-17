@@ -1,0 +1,192 @@
+/* EditRecoveryCodeModal — recovery code edit form */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* ── Field Groups ── */
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.separator {
+  border: none;
+  border-top: var(--border-subtle);
+  margin: var(--spacing-xs) 0;
+}
+
+/* ── Pin Checkbox ── */
+
+.pinCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.pinCheckbox input[type="checkbox"] {
+  accent-color: var(--color-warning);
+  cursor: pointer;
+}
+
+/* ── Reveal Prompt ── */
+
+.revealPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-xl) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Code Section ── */
+
+.codeSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.codeSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.codeBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-type-recovery);
+  font-weight: var(--font-weight-medium);
+}
+
+.removeCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+.pendingHeader {
+  margin-top: var(--spacing-sm);
+}
+
+/* ── Code List ── */
+
+.codeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.codeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-sm);
+}
+
+.codeMarkedRemoval {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.codeUsed .codeText {
+  opacity: 0.6;
+}
+
+.codeNew {
+  border-left: 2px solid var(--color-success);
+}
+
+.codeText {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.usedBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: color var(--duration-fast) var(--easing-default);
+}
+
+.removeBtn:hover {
+  color: var(--color-danger);
+}
+
+/* ── Textarea ── */
+
+.textareaLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.textarea {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-mono);
+  resize: vertical;
+  min-height: 60px;
+  transition: border-color var(--duration-fast) var(--easing-default);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-type-recovery);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.textarea::placeholder {
+  color: var(--color-text-muted);
+  font-family: var(--font-family);
+}
+
+.fieldError {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+/* ── Single Code Add Row ── */
+
+.singleAddRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-end;
+}
+
+.singleInput {
+  flex: 1;
+}

@@ -1,0 +1,75 @@
+.shell {
+  display: grid;
+  grid-template-rows: 48px 1fr 32px;
+  grid-template-columns: var(--sidebar-width, 200px) 1fr;
+  height: 100vh;
+  --sidebar-width: 200px;
+  transition: grid-template-columns var(--duration-normal) var(--easing-default);
+}
+
+.shell[data-collapsed="true"] {
+  --sidebar-width: 56px;
+}
+
+.shell > header {
+  grid-column: 1 / -1;
+}
+
+.shell > footer {
+  grid-column: 1 / -1;
+}
+
+.main {
+  grid-row: 2 / 3;
+  grid-column: 2;
+  overflow-y: auto;
+  background-color: var(--color-surface-0);
+}
+
+.content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-xl);
+}
+
+/* Skip link — visible only on :focus for keyboard navigation (WCAG 2.4.1) */
+.skipLink {
+  position: fixed;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  z-index: var(--z-toast);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  border-radius: var(--border-radius-sm);
+  border: var(--border-strong);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--duration-fast) var(--easing-default);
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+}
+
+/* ── Print: hide chrome, show only main content ── */
+@media print {
+  .shell {
+    display: block;
+    height: auto;
+  }
+
+  .skipLink {
+    display: none;
+  }
+
+  .main {
+    overflow: visible;
+  }
+
+  .content {
+    max-width: none;
+    padding: 0;
+  }
+}

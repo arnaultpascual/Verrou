@@ -1,0 +1,264 @@
+/* AddRecoveryCodeForm — recovery code creation modal */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* ── Mode Selector ── */
+
+.modeSelector {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.modeBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--easing-default),
+    color var(--duration-fast) var(--easing-default);
+}
+
+.modeBtn:hover {
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary);
+}
+
+.modeBtnActive {
+  border-color: var(--color-type-recovery);
+  color: var(--color-type-recovery);
+  background: var(--color-surface-3);
+}
+
+/* ── Field Groups ── */
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.separator {
+  border: none;
+  border-top: var(--border-subtle);
+  margin: var(--spacing-xs) 0;
+}
+
+/* ── Combobox Dropdown ── */
+
+.comboboxWrapper {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  margin-top: var(--spacing-xs);
+  z-index: 10;
+  list-style: none;
+  padding: var(--spacing-xs) 0;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.dropdownItem:hover {
+  background: var(--color-surface-3);
+}
+
+.dropdownName {
+  font-weight: var(--font-weight-medium);
+}
+
+.dropdownIssuer {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Native Select Wrapper ── */
+
+.selectWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.selectLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: var(--spacing-sm) calc(var(--spacing-md) + 20px) var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-md) center;
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--easing-default);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-type-recovery);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* ── Textarea ── */
+
+.textareaLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.textarea {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-mono);
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color var(--duration-fast) var(--easing-default);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-type-recovery);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.textarea::placeholder {
+  color: var(--color-text-muted);
+  font-family: var(--font-family);
+}
+
+.fieldError {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+/* ── Single Code Add Row ── */
+
+.singleAddRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-end;
+}
+
+.singleInput {
+  flex: 1;
+}
+
+/* ── Code Preview List ── */
+
+.codeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.codeListHeader {
+  display: flex;
+  align-items: center;
+}
+
+.codeListBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-type-recovery);
+  font-weight: var(--font-weight-medium);
+}
+
+.codeItems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: code-counter;
+}
+
+.codeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-sm);
+  counter-increment: code-counter;
+}
+
+.codeItem::before {
+  content: counter(code-counter) ".";
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  min-width: 20px;
+}
+
+.codeText {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: color var(--duration-fast) var(--easing-default);
+}
+
+.removeBtn:hover {
+  color: var(--color-danger);
+}

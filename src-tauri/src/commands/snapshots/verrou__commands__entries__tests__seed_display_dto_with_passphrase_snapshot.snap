@@ -1,0 +1,22 @@
+---
+source: src-tauri/src/commands/entries.rs
+expression: dto
+---
+{
+  "words": [
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "abandon",
+    "about"
+  ],
+  "wordCount": 12,
+  "hasPassphrase": true
+}

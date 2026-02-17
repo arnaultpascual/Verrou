@@ -1,0 +1,267 @@
+/* EntryCard — unified card shell for all entry types */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface-1);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  min-height: calc(var(--spacing-xl) * 4);
+  transition:
+    background var(--duration-fast) var(--easing-default),
+    border-color var(--duration-fast) var(--easing-default);
+}
+
+.card:hover {
+  background: var(--color-surface-3);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Header ── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.nameBlock {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issuer {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pin {
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+/* Pin toggle button — interactive star */
+.pinToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: var(--spacing-xs);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--easing-default),
+    color var(--duration-fast) var(--easing-default);
+}
+
+.card:hover .pinToggle,
+.pinToggle:focus-visible {
+  opacity: 1;
+}
+
+.pinTogglePinned {
+  color: var(--color-warning);
+  opacity: 1;
+}
+
+.pinToggle:hover {
+  color: var(--color-warning);
+}
+
+.pinToggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Content Zone ── */
+
+.content {
+  display: flex;
+  align-items: center;
+}
+
+/* ── TOTP / HOTP Code Zone ── */
+
+.codeZone {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-otp);
+  color: var(--color-text-primary);
+}
+
+.liveCode {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-otp);
+  font-weight: var(--font-weight-otp);
+  letter-spacing: var(--letter-spacing-otp);
+  color: var(--color-text-primary);
+  transition: opacity var(--duration-fast) var(--easing-default);
+}
+
+/* ── Copy Feedback ── */
+
+.cardCopied {
+  background: var(--color-surface-3);
+  transition: background var(--duration-normal) var(--easing-default);
+}
+
+.codeZoneCopyable {
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+.codeZoneCopyable:hover {
+  background: var(--color-surface-2);
+}
+
+/* ── Seed Phrase Zone ── */
+
+.seedZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.masked {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.seedMeta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ── Recovery Code Zone ── */
+
+.recoveryZone {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.recoveryText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.recoveryMeta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.recoveryAlertWarning {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+}
+
+.recoveryAlertDanger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+/* ── Secure Note Zone ── */
+
+.noteZone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.noteText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.noteTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.noteTag {
+  display: inline-flex;
+  padding: 1px var(--spacing-xs);
+  background: var(--color-surface-3);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+.noteTag:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+
+.noteTag:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* ── Credential Zone ── */
+
+.credentialZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.credentialUsername {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Fallback ── */
+
+.fallbackText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

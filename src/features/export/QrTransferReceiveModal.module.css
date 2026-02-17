@@ -1,0 +1,203 @@
+.description {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+/* Code entry phase */
+.codeForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.codeInput {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  letter-spacing: 0.04em;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  text-align: center;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--easing-default);
+}
+
+.codeInput:focus {
+  border-color: var(--color-primary);
+}
+
+.codeInput::placeholder {
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+.codeHint {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-align: center;
+  margin: 0;
+}
+
+/* Scanning phase */
+.scanningContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+}
+
+.videoWrapper {
+  position: relative;
+  width: 320px;
+  height: 240px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  border: var(--border-default);
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scanFrame {
+  width: 180px;
+  height: 180px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  opacity: 0.6;
+  animation: pulse-frame 2s ease-in-out infinite;
+}
+
+@keyframes pulse-frame {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.chunkProgress {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+}
+
+.progressBar {
+  width: 100%;
+  max-width: 320px;
+  height: 6px;
+  background: var(--color-bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width var(--duration-normal) var(--easing-default);
+}
+
+.lastScanned {
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+  animation: fade-in var(--duration-fast) var(--easing-default);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Ceremony / importing phase */
+.ceremonyWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-lg) 0;
+}
+
+/* Complete phase */
+.completeContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) 0;
+}
+
+.successIcon {
+  color: var(--color-success);
+}
+
+.successMessage {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  text-align: center;
+  margin: 0;
+}
+
+/* Error phase */
+.error {
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.errorContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.shake {
+  animation: shake var(--duration-normal) var(--easing-default);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+
+/* Camera permission denied */
+.cameraError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) 0;
+  text-align: center;
+}
+
+.cameraErrorIcon {
+  color: var(--color-warning);
+}
+
+.cameraErrorMessage {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}

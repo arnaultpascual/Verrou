@@ -1,0 +1,53 @@
+/* CountdownRing — circular SVG countdown for TOTP remaining seconds */
+
+.ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svg {
+  transform: rotate(-90deg);
+  transition: opacity var(--duration-fast) var(--easing-default);
+}
+
+.warning .svg {
+  animation: pulse var(--duration-slow) var(--easing-default) infinite alternate;
+}
+
+/* ── SVG circles ── */
+
+.trackCircle {
+  stroke: var(--border-color-subtle);
+  stroke-width: var(--stroke-width-ring);
+  opacity: var(--opacity-subtle);
+}
+
+.progressCircle {
+  stroke-width: var(--stroke-width-ring);
+  stroke-linecap: round;
+}
+
+/* Reduced-motion text fallback */
+.text {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-type-totp);
+  letter-spacing: var(--letter-spacing-wide);
+  min-width: var(--spacing-xl);
+  text-align: center;
+}
+
+.textWarning {
+  color: var(--color-warning);
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: var(--opacity-muted);
+  }
+}

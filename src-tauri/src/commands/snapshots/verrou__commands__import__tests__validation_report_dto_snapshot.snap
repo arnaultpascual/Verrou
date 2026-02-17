@@ -1,0 +1,39 @@
+---
+source: src-tauri/src/commands/import.rs
+assertion_line: 342
+expression: dto
+---
+{
+  "totalParsed": 5,
+  "validCount": 3,
+  "duplicateCount": 1,
+  "unsupportedCount": 1,
+  "malformedCount": 0,
+  "validEntries": [
+    {
+      "index": 0,
+      "name": "user@example.com",
+      "issuer": "GitHub",
+      "entryType": "totp",
+      "algorithm": "SHA1",
+      "digits": 6
+    }
+  ],
+  "duplicates": [
+    {
+      "index": 1,
+      "name": "existing@test.com",
+      "issuer": "Slack",
+      "existingId": "abc-123",
+      "existingName": "existing@test.com"
+    }
+  ],
+  "unsupported": [
+    {
+      "index": 2,
+      "name": "md5-user",
+      "reason": "MD5 algorithm not supported"
+    }
+  ],
+  "malformed": []
+}

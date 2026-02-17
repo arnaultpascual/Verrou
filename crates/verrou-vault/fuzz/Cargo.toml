@@ -1,0 +1,29 @@
+[package]
+name = "verrou-vault-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+verrou-vault = { path = ".." }
+
+[[bin]]
+name = "google_auth_import"
+path = "fuzz_targets/google_auth_import.rs"
+doc = false
+
+[[bin]]
+name = "aegis_import"
+path = "fuzz_targets/aegis_import.rs"
+doc = false
+
+[[bin]]
+name = "twofas_import"
+path = "fuzz_targets/twofas_import.rs"
+doc = false
+
+[workspace]

@@ -1,0 +1,209 @@
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.heading {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.summary {
+  display: flex;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--color-surface-0);
+  border: var(--border-subtle);
+  border-radius: var(--border-radius-md);
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.summaryCount {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.summaryLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  padding: var(--spacing-xs) 0;
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  width: 100%;
+}
+
+.sectionHeader:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.sectionCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.entryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: var(--size-list-max-height);
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+}
+
+.entryRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.entryRow:hover {
+  background-color: var(--color-surface-2);
+}
+
+.entryCheckbox {
+  flex-shrink: 0;
+}
+
+.entryName {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryIssuer {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.entryReason {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.duplicateMatch {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+}
+
+.unsupportedReason {
+  color: var(--color-warning);
+}
+
+.malformedReason {
+  color: var(--color-danger);
+}
+
+.addManuallyLink {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: none;
+}
+
+.addManuallyLink:hover {
+  text-decoration: underline;
+}
+
+.addManuallyLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.duplicateActions {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.duplicateToggle {
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.duplicateToggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.duplicateToggleActive {
+  color: var(--color-primary);
+  background-color: var(--color-primary-bg);
+  border-color: var(--color-primary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.importCount {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-right: auto;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.emptyDescription {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

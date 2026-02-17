@@ -1,0 +1,85 @@
+/* EditSeedPhraseModal — Seed phrase metadata edit form */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Read-only metadata ── */
+
+.readOnlyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.readOnlyLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.readOnlyValue {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* ── Info banner ── */
+
+.infoBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-primary-bg);
+  border-left: var(--spacing-xs) solid var(--color-primary);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+/* ── Passphrase section ── */
+
+.passphraseCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.passphraseCheckbox input[type="checkbox"] {
+  accent-color: var(--color-type-seed);
+  cursor: pointer;
+}
+
+/* ── Pin as Favorite Checkbox ── */
+
+.pinCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.pinCheckbox input[type="checkbox"] {
+  accent-color: var(--color-warning);
+  cursor: pointer;
+}
+
+/* ── Delete Button (pushed left in actions bar) ── */
+
+.deleteBtn {
+  margin-right: auto;
+}

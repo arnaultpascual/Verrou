@@ -1,0 +1,104 @@
+/* ── Toast list (bottom-center) ── */
+.list {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--spacing-sm);
+  width: 100%;
+  max-width: 360px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Individual toast ── */
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--border-color-default);
+  box-shadow: var(--shadow-popup);
+  animation: slideIn var(--duration-normal) var(--easing-default);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.message {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+}
+
+/* ── Variant accent ── */
+.success {
+  border-left: 3px solid var(--color-success);
+}
+
+.success .content svg {
+  color: var(--color-success);
+}
+
+.error {
+  border-left: 3px solid var(--color-danger);
+}
+
+.error .content svg {
+  color: var(--color-danger);
+}
+
+.info {
+  border-left: 3px solid var(--color-primary);
+}
+
+.info .content svg {
+  color: var(--color-primary);
+}
+
+/* ── Close button (error toasts) ── */
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+  margin-left: var(--spacing-sm);
+}
+
+.closeBtn:hover {
+  color: var(--color-text-secondary);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Animations ── */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

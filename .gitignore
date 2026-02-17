@@ -1,0 +1,40 @@
+# Build artifacts
+target/
+dist/
+.vite/
+
+# Dependencies
+node_modules/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Application data
+preferences.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# AI / tooling config (local only)
+.claude/
+_bmad/
+_bmad-output/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Tauri generated
+src-tauri/gen/
+
+# Test artifacts
+coverage/
+*.profraw

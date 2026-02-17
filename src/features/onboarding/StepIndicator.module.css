@@ -1,0 +1,57 @@
+.indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.dot {
+  width: var(--size-dot-indicator);
+  height: var(--size-dot-indicator);
+  border-radius: 50%;
+  background-color: var(--color-text-muted);
+  transition: background-color var(--duration-normal) var(--easing-default);
+}
+
+.dot.active {
+  background-color: var(--color-primary);
+}
+
+.dot.completed {
+  background-color: var(--color-success);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.label.activeLabel {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.label.completedLabel {
+  color: var(--color-success);
+}
+
+.stepText {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}

@@ -1,0 +1,126 @@
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+.item:hover {
+  background: var(--color-surface-3);
+}
+
+.selected {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.selected:hover {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.issuer {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pin toggle — always visible in compact popup */
+.pinToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: var(--spacing-xs);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--easing-default);
+}
+
+.pinTogglePinned {
+  color: var(--color-warning);
+}
+
+.pinToggle:hover {
+  color: var(--color-warning);
+}
+
+.pinToggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.codeArea {
+  flex-shrink: 0;
+  margin-left: var(--spacing-sm);
+}
+
+.masked {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.totpGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-otp);
+  font-weight: var(--font-weight-otp);
+  letter-spacing: var(--letter-spacing-otp);
+  color: var(--color-text-primary);
+}
+
+.username {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+
+.credentialHint {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

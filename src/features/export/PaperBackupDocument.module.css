@@ -1,0 +1,255 @@
+/* Print-optimized paper backup document layout.
+ * Uses design tokens for screen display, hardcoded monospace/grayscale for print. */
+
+.document {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+}
+
+/* ── Header ─────────────────────────── */
+
+.header {
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0 0 var(--spacing-xs);
+}
+
+.confidential {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-sm);
+}
+
+.meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Section ────────────────────────── */
+
+.section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin: 0 0 var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Entry block ────────────────────── */
+
+.entryBlock {
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.entryName {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.entryIssuer {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ── Seed phrase word grid ──────────── */
+
+.wordGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xs) var(--spacing-lg);
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.wordItem {
+  display: flex;
+  gap: var(--spacing-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.wordIndex {
+  color: var(--color-text-secondary);
+  min-width: 2ch;
+  text-align: right;
+}
+
+.wordText {
+  color: var(--color-text-primary);
+}
+
+.passphraseWarning {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0 0;
+  font-style: italic;
+}
+
+/* ── Recovery codes ─────────────────── */
+
+.codeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xs) var(--spacing-lg);
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.codeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.codeUsed {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+.statusIcon {
+  font-size: var(--font-size-xs);
+}
+
+.remainingNote {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0 0;
+}
+
+/* ── Footer ─────────────────────────── */
+
+.footer {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 2px solid var(--color-border);
+}
+
+.checksum {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  word-break: break-all;
+  margin: 0 0 var(--spacing-sm);
+}
+
+.checksumLabel {
+  font-weight: 600;
+}
+
+.footerWarning {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Empty state ────────────────────── */
+
+.emptyState {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* ══════════════════════════════════════
+   Print media styles
+   ══════════════════════════════════════ */
+
+@media print {
+  .document {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 10pt;
+    color: #000;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: #fff;
+  }
+
+  .header {
+    border-bottom: 2px solid #000;
+  }
+
+  .title {
+    font-size: 16pt;
+  }
+
+  .confidential {
+    color: #000;
+  }
+
+  .meta {
+    color: #333;
+  }
+
+  .sectionTitle {
+    border-bottom: 1px solid #000;
+    font-size: 12pt;
+    page-break-after: avoid;
+  }
+
+  .entryBlock {
+    border: 1px solid #000;
+    border-radius: 0;
+    page-break-inside: avoid;
+  }
+
+  .wordGrid,
+  .codeGrid {
+    border: 1px solid #000;
+    border-radius: 0;
+  }
+
+  .wordIndex {
+    color: #666;
+  }
+
+  .footer {
+    border-top: 2px solid #000;
+  }
+
+  .checksum,
+  .footerWarning {
+    color: #000;
+  }
+
+  /* Force page break between seed and recovery sections if needed */
+  .section + .section {
+    page-break-before: auto;
+  }
+}

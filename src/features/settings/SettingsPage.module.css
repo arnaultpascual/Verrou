@@ -1,0 +1,255 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  padding: var(--spacing-xl);
+  max-width: 560px;
+}
+
+.pageTitle {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Security section */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.sectionDescription {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Inline password change flow */
+.changeFlow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: var(--color-surface-1);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+}
+
+.flowHeading {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.flowDescription {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: var(--spacing-lg);
+}
+
+.passwordSection {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: var(--spacing-lg);
+}
+
+.formActions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+}
+
+.error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+/* Ceremony wrapper for inline display */
+.ceremonyWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) 0;
+}
+
+/* Recovery key display section */
+.keyDisplay {
+  padding: var(--spacing-lg);
+  background-color: var(--color-surface-0);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.keyText {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-wide);
+  word-break: break-all;
+}
+
+.fingerprint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+  text-align: center;
+}
+
+.fingerprint code {
+  font-family: var(--font-family-mono);
+}
+
+.printActions {
+  display: flex;
+  justify-content: center;
+}
+
+.confirmLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.confirmLabel input[type="checkbox"] {
+  width: var(--size-checkbox);
+  height: var(--size-checkbox);
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* Primary submit button */
+.submitBtn {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.submitBtn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.submitBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Informational note block */
+.infoNote {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface-1);
+  border: var(--border-default);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+.infoNoteIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Danger Zone ──────────────────────────────────────────── */
+
+.dangerSection {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+}
+
+.dangerTitle {
+  color: var(--color-danger);
+}
+
+.dangerBtn {
+  color: var(--color-danger) !important;
+  border-color: var(--color-danger) !important;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent) !important;
+}
+
+.dangerWarning {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-danger);
+}
+
+.dangerWarningTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.dangerWarningList {
+  font-size: var(--font-size-xs);
+  margin: 0;
+  padding-left: var(--spacing-lg);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+
+.shake {
+  animation: shake var(--duration-normal) var(--easing-default);
+}

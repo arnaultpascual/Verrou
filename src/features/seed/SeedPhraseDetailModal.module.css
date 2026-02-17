@@ -1,0 +1,49 @@
+/* SeedPhraseDetailModal — seed phrase entry detail view */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Metadata ── */
+
+.metadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metaLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.metaValue {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* ── Separator ── */
+
+.separator {
+  border: none;
+  border-top: var(--border-subtle);
+  margin: var(--spacing-xs) 0;
+}
+
+/* ── Delete Button (pushed left in actions bar) ── */
+
+.deleteBtn {
+  margin-right: auto;
+}

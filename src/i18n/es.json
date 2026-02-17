@@ -1,0 +1,188 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "done": "Listo",
+    "edit": "Editar",
+    "add": "Agregar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "change": "Cambiar",
+    "reset": "Restablecer",
+    "verify": "Verificar",
+    "print": "Imprimir",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "loading": "Cargando...",
+    "saving": "Guardando...",
+    "search": "Buscar",
+    "dismiss": "Descartar",
+    "or": "o"
+  },
+  "sidebar": {
+    "navigation": "Navegación",
+    "all": "Todo",
+    "totp": "TOTP",
+    "seeds": "Semillas",
+    "recovery": "Recuperación",
+    "notes": "Notas",
+    "passwords": "Contraseñas",
+    "health": "Estado",
+    "import": "Importar",
+    "folders": "Carpetas",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Contraer barra lateral"
+  },
+  "header": {
+    "title": "VERROU",
+    "searchPlaceholder": "Buscar entradas...",
+    "searchLabel": "Buscar entradas",
+    "searchHint": "Buscar (/)",
+    "lockVault": "Bloquear bóveda",
+    "settings": "Configuración"
+  },
+  "footer": {
+    "offlineByDesign": "Sin conexión por diseño",
+    "entryCount": "{{count}} entradas",
+    "entryCountZero": "0 entradas",
+    "version": "v0.1.0",
+    "offlineBadge": {
+      "heading": "Sin conexión por diseño",
+      "description": "VERROU no tiene permisos de red. Sus datos nunca salen de este dispositivo.",
+      "verifyButton": "Verificar en configuración del sistema",
+      "instructionMacos": "macOS: Configuración del Sistema → Privacidad y Seguridad → Red",
+      "instructionWindows": "Windows: Configuración → Red e Internet → Estado",
+      "instructionLinux": "Linux: Verifique la configuración de su firewall o compruebe que no existen conexiones de red."
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "preferences": "Preferencias",
+    "security": "Seguridad",
+    "theme": {
+      "label": "Tema",
+      "selectionAria": "Selección de tema",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Sistema",
+      "hint": "Elija su esquema de color preferido. Sistema sigue la configuración de su sistema operativo."
+    },
+    "autoLock": {
+      "label": "Tiempo de bloqueo automático",
+      "hint": "Bloquear la bóveda tras {{minutes}} minutos de inactividad."
+    },
+    "startup": {
+      "label": "Comportamiento al iniciar",
+      "launchOnBoot": "Iniciar con el sistema",
+      "launchOnBootHint": "Iniciar VERROU automáticamente al iniciar sesión.",
+      "startMinimized": "Iniciar minimizado en la bandeja",
+      "startMinimizedHint": "Abrir en segundo plano sin mostrar la ventana principal.",
+      "enabledToast": "VERROU se iniciará automáticamente.",
+      "disabledToast": "VERROU ya no se iniciará automáticamente.",
+      "errorToast": "No se pudo cambiar el inicio automático. Es posible que deba conceder permisos en la configuración del sistema."
+    },
+    "language": {
+      "label": "Idioma",
+      "hint": "Elija su idioma preferido. Los cambios se aplican de inmediato."
+    },
+    "shortcuts": {
+      "title": "Atajos de teclado"
+    },
+    "biometric": {
+      "title": "Desbloqueo biométrico"
+    },
+    "hardware": {
+      "title": "Seguridad por hardware"
+    },
+    "about": {
+      "title": "Acerca de VERROU",
+      "versionLabel": "Versión",
+      "buildLabel": "Build",
+      "licenseLabel": "Licencia",
+      "sourceCodeLabel": "Código fuente",
+      "auditLabel": "Auditoría de seguridad",
+      "auditNotPublished": "Aún no publicada"
+    },
+    "securityInfo": {
+      "title": "Seguridad de la bóveda",
+      "summary": "Sus datos están cifrados y se almacenan únicamente en este dispositivo.",
+      "encryptionLabel": "Cifrado",
+      "encryptionValue": "AES-256-GCM (autenticado)",
+      "kdfLabel": "Derivación de claves",
+      "kdfValue": "Argon2id (resistente en memoria)",
+      "kemLabel": "Intercambio de claves",
+      "kemValue": "X25519 + ML-KEM-1024 (híbrido post-cuántico)",
+      "learnMore": "Más información",
+      "learnLess": "Mostrar menos",
+      "detailAes": "AES-256-GCM: cifrado simétrico de 256 bits con tag de autenticación. Garantiza la confidencialidad e integridad de sus datos.",
+      "detailArgon2id": "Argon2id: ganador del Password Hashing Competition (2015). Algoritmo resistente en memoria contra ataques de fuerza bruta con GPU y ASIC.",
+      "detailX25519": "X25519: intercambio de claves por curva elíptica Diffie-Hellman. Estándar industrial para acuerdo seguro de claves.",
+      "detailMlKem": "ML-KEM-1024: estándar post-cuántico del NIST (FIPS 203). Protege sus datos contra futuros ordenadores cuánticos.",
+      "detailLocal": "Todas las operaciones criptográficas se ejecutan localmente — sin red, sin nube, sin telemetría."
+    }
+  },
+  "entries": {
+    "title": "Entradas",
+    "addButton": "Agregar entrada",
+    "empty": "Su bóveda está vacía. Agregue su primera entrada o importe desde otra aplicación.",
+    "type": {
+      "totp": "TOTP",
+      "hotp": "HOTP",
+      "seed": "Semilla",
+      "recovery": "Recuperación",
+      "note": "Nota",
+      "credential": "Contraseña",
+      "other": "Otro"
+    },
+    "sort": {
+      "label": "Ordenar entradas",
+      "alphaAsc": "A → Z",
+      "alphaDesc": "Z → A",
+      "newest": "Más recientes",
+      "oldest": "Más antiguos"
+    },
+    "addMenu": {
+      "totp": "Código TOTP",
+      "seed": "Frase semilla",
+      "recovery": "Códigos de recuperación",
+      "note": "Nota segura",
+      "credential": "Contraseña / Credencial"
+    }
+  },
+  "vault": {
+    "unlock": {
+      "heading": "La bóveda está bloqueada",
+      "submitButton": "Desbloquear",
+      "offlineBadge": "Sin conexión por diseño"
+    }
+  },
+  "components": {
+    "passwordInput": {
+      "showPassword": "Mostrar contraseña",
+      "hidePassword": "Ocultar contraseña",
+      "strengthWeak": "Débil",
+      "strengthFair": "Aceptable",
+      "strengthGood": "Buena",
+      "strengthExcellent": "Excelente",
+      "strengthAria": "Fortaleza de la contraseña: {{strength}}",
+      "guidance": "Pruebe una frase memorable como \"caballo correcto batería grapa\""
+    }
+  },
+  "quickAccess": {
+    "searchPlaceholder": "Buscar entradas...",
+    "noEntries": "No hay entradas en la bóveda"
+  },
+  "passwordHealth": {
+    "title": "Estado de contraseñas"
+  },
+  "folders": {
+    "allEntries": "Todas las entradas",
+    "newFolder": "Nueva carpeta"
+  },
+  "attachments": {
+    "title": "Adjuntos"
+  }
+}

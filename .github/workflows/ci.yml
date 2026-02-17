@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Cargo build (workspace)
+        run: cargo build --workspace
+
+      - name: Cargo build (crypto-core standalone)
+        run: cargo build --lib -p verrou-crypto-core
+
+      - name: Cargo build (vault standalone)
+        run: cargo build --lib -p verrou-vault
+
+      - name: Cargo fmt check
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Cargo deny check
+        run: cargo deny check
+
+      - name: Check no network dependencies in crypto-core and vault
+        run: |
+          BANNED="hyper|reqwest|curl|async-std|surf|ureq|tokio|mio|isahc|attohttpc|h2"
+          FAIL=0
+          for CRATE in verrou-crypto-core verrou-vault; do
+            if cargo tree -p "$CRATE" --prefix none 2>/dev/null | grep -qiE "^($BANNED) "; then
+              echo "ERROR: Network-capable crate found in $CRATE dependency tree!"
+              cargo tree -p "$CRATE" --prefix none | grep -iE "^($BANNED) "
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "No banned network crates found in crypto-core or vault."
+
+      - name: Verify crypto-core dependency count (NFR30)
+        run: |
+          # Direct production dependencies only (--depth 1 -e no-dev).
+          # Architecture targets ~10 deps; threshold set to 30 for growth margin.
+          MAX_DEPS=30
+          DEP_COUNT=$(cargo tree -p verrou-crypto-core --prefix none --depth 1 -e no-dev 2>/dev/null \
+            | sed 's/ v.*//' | sort -u | grep -v '^verrou-crypto-core$' | wc -l | tr -d ' ')
+          echo "verrou-crypto-core direct production dependencies: $DEP_COUNT (limit: $MAX_DEPS)"
+          if [ "$DEP_COUNT" -gt "$MAX_DEPS" ]; then
+            echo "ERROR: verrou-crypto-core has $DEP_COUNT direct deps (max: $MAX_DEPS)"
+            cargo tree -p verrou-crypto-core --prefix none --depth 1 -e no-dev
+            exit 1
+          fi
+
+      - name: Check no secret logging
+        run: bash .github/scripts/check-no-secret-logging.sh
+
+      - name: Run Rust tests
+        run: cargo test --workspace --no-fail-fast
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Security validation (Layer 3 + 6)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "=== Layer 3: Network isolation ==="
+          bash .github/scripts/verify-zero-network.sh
+          echo ""
+          echo "=== Layer 6: Binary hardening ==="
+          bash .github/scripts/verify-binary-hardening.sh

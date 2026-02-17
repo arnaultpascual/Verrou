@@ -1,0 +1,188 @@
+{
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "confirm": "Bestätigen",
+    "done": "Fertig",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "change": "Ändern",
+    "reset": "Zurücksetzen",
+    "verify": "Überprüfen",
+    "print": "Drucken",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "loading": "Wird geladen...",
+    "saving": "Wird gespeichert...",
+    "search": "Suchen",
+    "dismiss": "Verwerfen",
+    "or": "oder"
+  },
+  "sidebar": {
+    "navigation": "Navigation",
+    "all": "Alle",
+    "totp": "TOTP",
+    "seeds": "Seeds",
+    "recovery": "Wiederherstellung",
+    "notes": "Notizen",
+    "passwords": "Passwörter",
+    "health": "Zustand",
+    "import": "Importieren",
+    "folders": "Ordner",
+    "expandSidebar": "Seitenleiste ausklappen",
+    "collapseSidebar": "Seitenleiste einklappen"
+  },
+  "header": {
+    "title": "VERROU",
+    "searchPlaceholder": "Einträge durchsuchen...",
+    "searchLabel": "Einträge durchsuchen",
+    "searchHint": "Suchen (/)",
+    "lockVault": "Tresor sperren",
+    "settings": "Einstellungen"
+  },
+  "footer": {
+    "offlineByDesign": "Offline by Design",
+    "entryCount": "{{count}} Einträge",
+    "entryCountZero": "0 Einträge",
+    "version": "v0.1.0",
+    "offlineBadge": {
+      "heading": "Offline by Design",
+      "description": "VERROU hat keine Netzwerkberechtigungen. Ihre Daten verlassen dieses Gerät nie.",
+      "verifyButton": "In den Systemeinstellungen überprüfen",
+      "instructionMacos": "macOS: Systemeinstellungen → Datenschutz & Sicherheit → Netzwerk",
+      "instructionWindows": "Windows: Einstellungen → Netzwerk und Internet → Status",
+      "instructionLinux": "Linux: Überprüfen Sie Ihre Firewall-Einstellungen oder vergewissern Sie sich, dass keine Netzwerkverbindungen bestehen."
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "preferences": "Einstellungen",
+    "security": "Sicherheit",
+    "theme": {
+      "label": "Erscheinungsbild",
+      "selectionAria": "Erscheinungsbild auswählen",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System",
+      "hint": "Wählen Sie Ihr bevorzugtes Farbschema. \u201ESystem\u201C übernimmt die Einstellung Ihres Betriebssystems."
+    },
+    "autoLock": {
+      "label": "Automatische Sperre",
+      "hint": "Den Tresor nach {{minutes}} Minuten Inaktivität sperren."
+    },
+    "startup": {
+      "label": "Startverhalten",
+      "launchOnBoot": "Beim Systemstart öffnen",
+      "launchOnBootHint": "VERROU automatisch starten, wenn Sie sich anmelden.",
+      "startMinimized": "Minimiert im Infobereich starten",
+      "startMinimizedHint": "Im Hintergrund starten, ohne das Hauptfenster anzuzeigen.",
+      "enabledToast": "VERROU wird jetzt automatisch gestartet.",
+      "disabledToast": "VERROU wird nicht mehr automatisch gestartet.",
+      "errorToast": "Der automatische Start konnte nicht geändert werden. Möglicherweise müssen Sie eine Berechtigung in den Systemeinstellungen erteilen."
+    },
+    "language": {
+      "label": "Sprache",
+      "hint": "Wählen Sie Ihre bevorzugte Sprache. Änderungen werden sofort wirksam."
+    },
+    "shortcuts": {
+      "title": "Tastenkürzel"
+    },
+    "biometric": {
+      "title": "Biometrische Entsperrung"
+    },
+    "hardware": {
+      "title": "Hardware-Sicherheit"
+    },
+    "about": {
+      "title": "Über VERROU",
+      "versionLabel": "Version",
+      "buildLabel": "Build",
+      "licenseLabel": "Lizenz",
+      "sourceCodeLabel": "Quellcode",
+      "auditLabel": "Sicherheitsaudit",
+      "auditNotPublished": "Noch nicht veröffentlicht"
+    },
+    "securityInfo": {
+      "title": "Tresor-Sicherheit",
+      "summary": "Ihre Daten sind verschlüsselt und werden nur auf diesem Gerät gespeichert.",
+      "encryptionLabel": "Verschlüsselung",
+      "encryptionValue": "AES-256-GCM (authentifiziert)",
+      "kdfLabel": "Schlüsselableitung",
+      "kdfValue": "Argon2id (speicherhart)",
+      "kemLabel": "Schlüsselaustausch",
+      "kemValue": "X25519 + ML-KEM-1024 (hybrid post-quantisch)",
+      "learnMore": "Mehr erfahren",
+      "learnLess": "Weniger anzeigen",
+      "detailAes": "AES-256-GCM: 256-Bit symmetrische Verschlüsselung mit Authentifizierungstag. Gewährleistet Vertraulichkeit und Integrität Ihrer Daten.",
+      "detailArgon2id": "Argon2id: Gewinner des Password Hashing Competition (2015). Speicherharter Algorithmus, der GPU- und ASIC-Brute-Force-Angriffe abwehrt.",
+      "detailX25519": "X25519: Elliptische-Kurven-Diffie-Hellman-Schlüsselaustausch. Industriestandard für sichere Schlüsselvereinbarung.",
+      "detailMlKem": "ML-KEM-1024: NIST Post-Quanten-Standard (FIPS 203). Schützt Ihre Daten vor zukünftigen Quantencomputern.",
+      "detailLocal": "Alle kryptografischen Operationen laufen lokal — kein Netzwerk, keine Cloud, keine Telemetrie."
+    }
+  },
+  "entries": {
+    "title": "Einträge",
+    "addButton": "Eintrag hinzufügen",
+    "empty": "Ihr Tresor ist leer. Fügen Sie Ihren ersten Eintrag hinzu oder importieren Sie aus einer anderen App.",
+    "type": {
+      "totp": "TOTP",
+      "hotp": "HOTP",
+      "seed": "Seed",
+      "recovery": "Wiederherstellung",
+      "note": "Notiz",
+      "credential": "Passwort",
+      "other": "Sonstiges"
+    },
+    "sort": {
+      "label": "Einträge sortieren",
+      "alphaAsc": "A → Z",
+      "alphaDesc": "Z → A",
+      "newest": "Neueste",
+      "oldest": "Älteste"
+    },
+    "addMenu": {
+      "totp": "TOTP-Code",
+      "seed": "Seed Phrase",
+      "recovery": "Wiederherstellungscodes",
+      "note": "Sichere Notiz",
+      "credential": "Passwort / Zugangsdaten"
+    }
+  },
+  "vault": {
+    "unlock": {
+      "heading": "Tresor ist gesperrt",
+      "submitButton": "Entsperren",
+      "offlineBadge": "Offline by Design"
+    }
+  },
+  "components": {
+    "passwordInput": {
+      "showPassword": "Passwort anzeigen",
+      "hidePassword": "Passwort verbergen",
+      "strengthWeak": "Schwach",
+      "strengthFair": "Mäßig",
+      "strengthGood": "Gut",
+      "strengthExcellent": "Ausgezeichnet",
+      "strengthAria": "Passwortstärke: {{strength}}",
+      "guidance": "Versuchen Sie einen einprägsamen Satz wie \u201Erichtig Pferd Batterie Klammer\u201C"
+    }
+  },
+  "quickAccess": {
+    "searchPlaceholder": "Einträge durchsuchen...",
+    "noEntries": "Keine Einträge im Tresor"
+  },
+  "passwordHealth": {
+    "title": "Passwort-Zustand"
+  },
+  "folders": {
+    "allEntries": "Alle Einträge",
+    "newFolder": "Neuer Ordner"
+  },
+  "attachments": {
+    "title": "Anhänge"
+  }
+}

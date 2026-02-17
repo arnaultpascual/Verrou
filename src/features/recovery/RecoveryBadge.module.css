@@ -1,0 +1,7 @@
+/* RecoveryBadge — inline badge for recovery code stats */
+
+.badge {
+  font-size: var(--font-size-xs);
+  color: var(--color-type-recovery);
+  font-weight: var(--font-weight-medium);
+}

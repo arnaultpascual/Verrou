@@ -1,0 +1,26 @@
+/* ConfirmDeleteModal — Destructive action confirmation dialog */
+
+.body {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+.entryName {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+/* ── Cascade deletion warning ── */
+
+.cascadeWarning {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-radius: var(--border-radius-sm);
+  margin-top: var(--spacing-md);
+}

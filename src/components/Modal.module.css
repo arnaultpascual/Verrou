@@ -1,0 +1,124 @@
+/* ── Overlay ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background-color: var(--color-overlay);
+  animation: fadeIn var(--duration-normal) var(--easing-default);
+}
+
+/* ── Content panel ── */
+.content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-modal);
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-popup);
+  padding: var(--spacing-xl);
+  animation: scaleIn var(--duration-normal) var(--easing-default);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+}
+
+.closeBtn:hover {
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface-3);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Body ── */
+.body {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+}
+
+/* ── Actions ── */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xl);
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ── Print: flatten modal for full-page print ── */
+@media print {
+  .overlay {
+    display: none;
+  }
+
+  .content {
+    position: static;
+    transform: none;
+    z-index: auto;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    background: #fff;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    animation: none;
+  }
+
+  .header {
+    display: none;
+  }
+}

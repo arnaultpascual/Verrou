@@ -1,0 +1,123 @@
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.heading {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+.error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+/* ── Creation progress ────────────────────────────────────────── */
+
+.creationProgress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-2xl) 0;
+}
+
+.spinnerContainer {
+  color: var(--color-primary);
+}
+
+.phaseMessage {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+  text-align: center;
+}
+
+.progressWrapper {
+  width: 100%;
+  max-width: 280px;
+}
+
+.progressBar {
+  height: 4px;
+  background-color: var(--color-surface-0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: 2px;
+}
+
+.progressHint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Recovery key display ─────────────────────────────────────── */
+
+.keyDisplay {
+  padding: var(--spacing-lg);
+  background-color: var(--color-surface-0);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+}
+
+.keyText {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-wide);
+  word-break: break-all;
+}
+
+.fingerprint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.fingerprint code {
+  font-family: var(--font-family-mono);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.confirmLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.confirmLabel input[type="checkbox"] {
+  width: var(--size-checkbox);
+  height: var(--size-checkbox);
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}

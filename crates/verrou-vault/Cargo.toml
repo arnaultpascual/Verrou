@@ -1,0 +1,28 @@
+[package]
+name = "verrou-vault"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Vault business logic for VERROU — SQLCipher storage layer"
+
+[dependencies]
+verrou-crypto-core = { path = "../verrou-crypto-core" }
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+rand = "0.8"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+zeroize = "1"
+blake3 = "1"
+prost = "0.13"
+data-encoding = "2"
+scrypt = "0.11"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+
+[dev-dependencies]
+proptest = "1"
+tempfile = "3"
+
+[lints]
+workspace = true

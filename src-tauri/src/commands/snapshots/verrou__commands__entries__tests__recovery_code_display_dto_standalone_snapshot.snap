@@ -1,0 +1,15 @@
+---
+source: src-tauri/src/commands/entries.rs
+assertion_line: 1430
+expression: dto
+---
+{
+  "codes": [
+    "CODE-A",
+    "CODE-B"
+  ],
+  "used": [],
+  "totalCodes": 2,
+  "remainingCodes": 2,
+  "hasLinkedEntry": false
+}

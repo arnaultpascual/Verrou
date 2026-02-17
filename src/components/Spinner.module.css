@@ -1,0 +1,60 @@
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.ring {
+  animation: spin 1.2s linear infinite;
+}
+
+.track {
+  opacity: 0.2;
+}
+
+.arc {
+  opacity: 1;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion: show static text fallback */
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    display: none;
+  }
+
+  .srOnly {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+}

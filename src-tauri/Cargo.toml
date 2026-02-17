@@ -1,0 +1,43 @@
+[package]
+name = "verrou"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VERROU — Sovereign post-quantum encrypted digital vault"
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+verrou-vault = { path = "../crates/verrou-vault" }
+verrou-crypto-core = { path = "../crates/verrou-crypto-core" }
+tauri = { version = "2.10", features = ["tray-icon"] }
+tauri-plugin-clipboard-manager = "2.3"
+tauri-plugin-global-shortcut = "2.3"
+tauri-plugin-dialog = "2.6"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = "0.1"
+tracing-appender = "0.2"
+blake3 = "1"
+zeroize = "1"
+data-encoding = "2"
+tauri-plugin-autostart = "2.5"
+open = "5"
+tauri-plugin-positioner = { version = "2.3.1", features = ["tray-icon"] }
+tokio = { version = "1", features = ["time"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSData"] }
+security-framework = { version = "3", features = ["OSX_10_13"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+clipboard-win = "5"
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }
+
+[lints]
+workspace = true

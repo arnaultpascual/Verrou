@@ -1,0 +1,165 @@
+/* SecureNoteDetailModal — secure note detail view/edit */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Metadata ── */
+
+.metadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metaLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.metaValue {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.separator {
+  border: none;
+  border-top: var(--border-subtle);
+  margin: var(--spacing-xs) 0;
+}
+
+/* ── Tags ── */
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--spacing-sm);
+  background: var(--color-surface-3);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ── Rendered Body ── */
+
+.body {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: break-word;
+}
+
+.body h1,
+.body h2,
+.body h3 {
+  margin: var(--spacing-md) 0 var(--spacing-xs);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.body h1 { font-size: var(--font-size-xl); }
+.body h2 { font-size: var(--font-size-lg); }
+.body h3 { font-size: var(--font-size-md); }
+
+.body p {
+  margin: 0 0 var(--spacing-sm);
+}
+
+.body ul,
+.body ol {
+  margin: 0 0 var(--spacing-sm);
+  padding-left: var(--spacing-lg);
+}
+
+.body li {
+  margin-bottom: var(--spacing-xs);
+}
+
+.body code {
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+  padding: 1px 4px;
+  background: var(--color-surface-3);
+  border-radius: var(--border-radius-sm);
+}
+
+.body pre {
+  margin: 0 0 var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-md);
+  overflow-x: auto;
+}
+
+.body pre code {
+  padding: 0;
+  background: none;
+}
+
+.body strong { font-weight: var(--font-weight-medium); }
+
+/* ── Edit Mode ── */
+
+.editSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.editTagsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.editTagsLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.editTextarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-mono);
+  line-height: var(--line-height-relaxed);
+  resize: vertical;
+}
+
+.editTextarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* ── Action Bar ── */
+
+.actionBar {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.deleteBtn {
+  margin-right: auto;
+}

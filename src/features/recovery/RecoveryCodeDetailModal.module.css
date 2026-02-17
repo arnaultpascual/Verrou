@@ -1,0 +1,167 @@
+/* RecoveryCodeDetailModal — recovery code entry detail view */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Metadata ── */
+
+.metadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metaLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.metaValue {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.codeCount {
+  color: var(--color-type-recovery);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Separator ── */
+
+.separator {
+  border: none;
+  border-top: var(--border-subtle);
+  margin: var(--spacing-xs) 0;
+}
+
+/* ── Alert Banner ── */
+
+.alertBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.alertWarning {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.alertDanger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+/* ── Masked State ── */
+
+.maskedContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-xl) 0;
+}
+
+.maskedCodes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Revealed State ── */
+
+.revealedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.timerBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.codeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.codeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-sm);
+}
+
+.codeUsed .codeText {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.codeCheckbox {
+  cursor: pointer;
+  width: var(--size-checkbox);
+  height: var(--size-checkbox);
+  accent-color: var(--color-type-recovery);
+  flex-shrink: 0;
+}
+
+.codeCheckbox:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.codeText {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.usedBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.revealedActions {
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Action Buttons (in actions bar) ── */
+
+.editBtn {
+  margin-right: auto;
+}

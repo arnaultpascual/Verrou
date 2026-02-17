@@ -1,0 +1,16 @@
+---
+source: src-tauri/src/commands/entries.rs
+assertion_line: 508
+expression: dto
+---
+{
+  "id": "00000000-0000-4000-8000-000000000000",
+  "entryType": "secure_note",
+  "name": "Private Note",
+  "algorithm": "SHA1",
+  "digits": 6,
+  "period": 30,
+  "pinned": false,
+  "createdAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-01-01T00:00:00Z"
+}

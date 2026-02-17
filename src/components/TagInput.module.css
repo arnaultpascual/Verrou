@@ -1,0 +1,79 @@
+/* TagInput — chip-style tag input */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-2);
+  border: var(--border-default);
+  border-radius: var(--border-radius-md);
+  min-height: 38px;
+  cursor: text;
+  transition: border-color var(--duration-fast) var(--easing-default);
+}
+
+.container:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* ── Chip ── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px var(--spacing-xs) 2px var(--spacing-sm);
+  background: var(--color-surface-3);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.chipText {
+  line-height: 1.4;
+}
+
+.chipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: color var(--duration-fast) var(--easing-default);
+}
+
+.chipRemove:hover {
+  color: var(--color-danger);
+}
+
+/* ── Input ── */
+
+.input {
+  flex: 1;
+  min-width: 80px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  outline: none;
+  padding: var(--spacing-xs) 0;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}

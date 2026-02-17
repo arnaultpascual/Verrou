@@ -1,0 +1,17 @@
+/* ConfirmDeleteSeedModal — Heightened seed phrase deletion confirmation */
+
+.body {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+.walletName {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.warning {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-medium);
+}

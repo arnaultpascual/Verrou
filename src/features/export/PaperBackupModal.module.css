@@ -1,0 +1,98 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.description {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.ceremonyWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-lg) 0;
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.warningIcon {
+  color: var(--color-warning);
+  flex-shrink: 0;
+  margin-top: var(--spacing-xs);
+}
+
+.warningText {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.previewWrapper {
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-bottom: var(--spacing-md);
+}
+
+.errorContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.error {
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.shake {
+  animation: shake var(--duration-normal) var(--easing-default);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+
+/* ══════════════════════════════════════
+   Print: hide modal chrome, show only backup document
+   ══════════════════════════════════════ */
+
+@media print {
+  .form,
+  .actions,
+  .ceremonyWrapper,
+  .warning,
+  .errorContent,
+  .description {
+    display: none !important;
+  }
+
+  .previewWrapper {
+    max-height: none;
+    overflow: visible;
+    margin: 0;
+  }
+}

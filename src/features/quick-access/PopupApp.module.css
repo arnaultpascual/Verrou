@@ -1,0 +1,19 @@
+.container {
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-popup);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-md);
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  animation: fadeIn var(--duration-fast) var(--easing-default);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
