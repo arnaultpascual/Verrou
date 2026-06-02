@@ -21,7 +21,6 @@ const STEP_LABELS_KEYS = [
 export interface ImportWizardProps {
   onComplete: (importedCount?: number) => void;
   onCancel: () => void;
-  embedded?: boolean;
 }
 
 export interface WizardState {

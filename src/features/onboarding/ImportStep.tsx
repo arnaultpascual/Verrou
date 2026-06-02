@@ -60,7 +60,6 @@ export const ImportStep: Component = () => {
 
       <Show when={showImport()}>
         <ImportWizard
-          embedded
           onComplete={handleImportComplete}
           onCancel={handleImportCancel}
         />

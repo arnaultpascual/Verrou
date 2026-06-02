@@ -12,8 +12,15 @@ export interface ReAuthPromptProps {
   open: boolean;
   /** Called when dialog should close */
   onClose: () => void;
-  /** Called after successful verification with the password */
-  onVerified: (password: string) => void;
+  /**
+   * Perform the real, re-authenticated action with the entered password
+   * (e.g. reveal / delete). MUST return a promise that **rejects** if the
+   * password is wrong or the action fails: the prompt surfaces the failure
+   * inline and keeps itself open for retry. The "Verifying…" ceremony tracks
+   * this promise and only shows the success state once it actually resolves —
+   * there is no fake timer and no premature "Verified".
+   */
+  onVerified: (password: string) => Promise<void>;
 }
 
 type Phase = "input" | "ceremony";
@@ -25,16 +32,50 @@ export const ReAuthPrompt: Component<ReAuthPromptProps> = (props) => {
   const [progress, setProgress] = createSignal(0);
 
   // Reset state when modal opens
-  createEffect(on(() => props.open, (open) => {
-    if (open) {
-      setPassword("");
-      setError("");
-      setPhase("input");
-      setProgress(0);
-    }
-  }));
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (open) {
+          setPassword("");
+          setError("");
+          setPhase("input");
+          setProgress(0);
+        }
+      },
+    ),
+  );
 
-  const handleSubmit = (e: Event) => {
+  let rampHandle = 0;
+  const stopRamp = () => {
+    if (rampHandle) {
+      cancelAnimationFrame(rampHandle);
+      rampHandle = 0;
+    }
+  };
+
+  // Honest activity indicator: ramp the bar toward — but never reaching — 100
+  // while the real verification runs. Completion (100 → "Verified") is set ONLY
+  // when the backend actually confirms success, so the ceremony never claims
+  // success before the password has been checked.
+  const startRamp = () => {
+    const start = Date.now();
+    const durationToCap = 2000;
+    const cap = 90;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(cap, (elapsed / durationToCap) * cap);
+      setProgress(pct);
+      if (pct < cap) {
+        rampHandle = requestAnimationFrame(tick);
+      }
+    };
+    rampHandle = requestAnimationFrame(tick);
+  };
+
+  onCleanup(stopRamp);
+
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
     if (!password()) {
       setError(t("components.reAuthPrompt.passwordRequired"));
@@ -42,36 +83,26 @@ export const ReAuthPrompt: Component<ReAuthPromptProps> = (props) => {
     }
     setError("");
     setPhase("ceremony");
-    simulateProgress();
-  };
-
-  let rafHandle = 0;
-
-  const simulateProgress = () => {
-    // Simulate KDF verification (~3s) — will be replaced with real Tauri IPC in Story 2.8
-    const start = Date.now();
-    const duration = 3000;
-
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const pct = Math.min(100, (elapsed / duration) * 100);
-      setProgress(pct);
-
-      if (pct < 100) {
-        rafHandle = requestAnimationFrame(tick);
-      }
-    };
-
-    rafHandle = requestAnimationFrame(tick);
-  };
-
-  onCleanup(() => {
-    if (rafHandle) cancelAnimationFrame(rafHandle);
-  });
-
-  const handleCeremonyComplete = () => {
-    const pw = password();
-    props.onVerified(pw);
+    setProgress(0);
+    startRamp();
+    try {
+      await props.onVerified(password());
+      // Real success — only now mark the ceremony complete ("Verified").
+      stopRamp();
+      setProgress(100);
+    } catch (err) {
+      // Wrong password / failure — surface inline and return to input for retry.
+      stopRamp();
+      setPhase("input");
+      setProgress(0);
+      setError(
+        typeof err === "string"
+          ? err
+          : err instanceof Error
+            ? err.message
+            : t("components.reAuthPrompt.failed"),
+      );
+    }
   };
 
   return (
@@ -81,16 +112,9 @@ export const ReAuthPrompt: Component<ReAuthPromptProps> = (props) => {
       title={t("components.reAuthPrompt.title")}
       closeOnOverlayClick={false}
     >
-      <Show when={phase() === "input"} fallback={
-        <SecurityCeremony
-          progress={progress()}
-          onComplete={handleCeremonyComplete}
-        />
-      }>
+      <Show when={phase() === "input"} fallback={<SecurityCeremony progress={progress()} />}>
         <form onSubmit={handleSubmit} class={styles.form}>
-          <p class={styles.description}>
-            {t("components.reAuthPrompt.description")}
-          </p>
+          <p class={styles.description}>{t("components.reAuthPrompt.description")}</p>
           <PasswordInput
             label={t("components.reAuthPrompt.passwordLabel")}
             mode="unlock"
@@ -103,9 +127,7 @@ export const ReAuthPrompt: Component<ReAuthPromptProps> = (props) => {
             <Button variant="ghost" onClick={props.onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit">
-              {t("common.verify")}
-            </Button>
+            <Button type="submit">{t("common.verify")}</Button>
           </div>
         </form>
       </Show>

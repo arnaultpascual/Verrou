@@ -271,6 +271,37 @@ describe("EditCredentialModal", () => {
       });
     });
 
+    it("omits un-loadable fields so a save never wipes them (data-loss guard)", async () => {
+      render(() => <EditCredentialModal {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(findInputByLabel("Name")).toBeTruthy();
+      });
+
+      const nameInput = findInputByLabel("Name")!;
+      fireEvent.input(nameInput, { target: { value: "GitLab" } });
+
+      const saveBtn = document.querySelector("[data-testid='edit-credential-save-btn']") as HTMLElement;
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(mockUpdateEntry).toHaveBeenCalled();
+        const callArg = mockUpdateEntry.mock.calls[0][0];
+        // These are not loaded by this form (encrypted entry data, reveal-only).
+        // They must be OMITTED (undefined) so the backend preserves them, rather
+        // than receiving null/[] which would silently wipe the stored values.
+        expect(callArg.username).toBeUndefined();
+        expect(callArg.issuer).toBeUndefined();
+        expect(callArg.urls).toBeUndefined();
+        expect(callArg.notes).toBeUndefined();
+        expect(callArg.linkedTotpId).toBeUndefined();
+        expect(callArg.customFields).toBeUndefined();
+        // ...while the fields this form does manage are present.
+        expect(callArg.name).toBe("GitLab");
+        expect(callArg.tags).toEqual(["dev", "work"]);
+      });
+    });
+
     it("shows error toast when updateEntry fails", async () => {
       mockUpdateEntry.mockRejectedValue("Database error");
 

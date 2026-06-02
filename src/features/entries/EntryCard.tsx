@@ -190,7 +190,10 @@ export const EntryCard: Component<EntryCardProps> = (props) => {
               <span class={styles.masked} data-testid="seed-masked">
                 {"●●●●● ●●●●● ●●●●●"}
               </span>
-              <span class={styles.seedMeta}>{t("entries.card.seedWords", { count: "24" })}</span>
+              {/* Word count is not available in list metadata (it lives in the
+                  encrypted secret), so we don't show a count here rather than a
+                  hardcoded, often-wrong one. The real count is shown in the seed
+                  detail/edit views. */}
             </div>
           </Match>
           <Match when={props.entry.entryType === "recovery_code"}>

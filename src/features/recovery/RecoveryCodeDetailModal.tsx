@@ -125,15 +125,11 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
   };
 
   const handleVerified = async (password: string) => {
+    // Throws on wrong password — ReAuthPrompt shows the error inline and retries.
+    const data = await revealRecoveryCodes(props.entryId, password);
+    setRevealedData(data);
+    setSessionPassword(password);
     setShowReAuth(false);
-    try {
-      const data = await revealRecoveryCodes(props.entryId, password);
-      setRevealedData(data);
-      setSessionPassword(password);
-    } catch (err) {
-      const msg = typeof err === "string" ? err : t("recovery.detail.revealError");
-      toast.error(msg);
-    }
   };
 
   const handleHide = () => {
@@ -156,15 +152,11 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
   };
 
   const handleDeleteVerified = async (password: string) => {
+    // Throws on wrong password — ReAuthPrompt shows the error inline.
+    await deleteRecoveryCodeEntry(props.entryId, password);
     setDeleteReAuth(false);
-    try {
-      await deleteRecoveryCodeEntry(props.entryId, password);
-      toast.success(t("recovery.detail.deleted"));
-      props.onDeleted?.();
-    } catch (err) {
-      const msg = typeof err === "string" ? err : t("recovery.detail.deleteError");
-      toast.error(msg);
-    }
+    toast.success(t("recovery.detail.deleted"));
+    props.onDeleted?.();
   };
 
   const handleToggle = async (codeIndex: number) => {

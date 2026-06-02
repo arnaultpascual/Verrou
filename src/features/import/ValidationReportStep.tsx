@@ -134,16 +134,11 @@ export const ValidationReportStep: Component<ValidationReportStepProps> = (props
       {/* Valid entries section */}
       <Show when={!hasNoValid()}>
         <div class={styles.section}>
-          <button
-            type="button"
-            class={styles.sectionHeader}
-            onClick={() => {}}
-            aria-expanded="true"
-          >
+          <div class={styles.sectionHeaderStatic}>
             <Icon name="check" size={16} />
             {t("import.validationReport.validEntries")}
             <span class={styles.sectionCount}>({props.report.validCount})</span>
-          </button>
+          </div>
           <div class={styles.entryList}>
             <For each={props.report.validEntries}>
               {(entry) => (

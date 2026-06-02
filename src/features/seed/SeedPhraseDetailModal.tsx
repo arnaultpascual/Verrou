@@ -43,14 +43,11 @@ export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (pro
   };
 
   const handleVerified = async (password: string) => {
+    // Throws on wrong password — ReAuthPrompt surfaces the error inline and
+    // keeps the prompt open for retry. We only close on a real reveal success.
+    const data = await revealSeedPhrase(props.entryId, password);
+    setRevealedData(data);
     setShowReAuth(false);
-    try {
-      const data = await revealSeedPhrase(props.entryId, password);
-      setRevealedData(data);
-    } catch (err) {
-      const msg = typeof err === "string" ? err : t("seed.detail.incorrectPassword");
-      toast.error(msg);
-    }
   };
 
   const handleClear = () => {

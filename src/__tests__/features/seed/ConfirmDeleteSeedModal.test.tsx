@@ -123,7 +123,7 @@ describe("ConfirmDeleteSeedModal", () => {
       }
     });
 
-    it("shows error toast when deletion fails", async () => {
+    it("shows inline error when deletion fails", async () => {
       mockDeleteSeedPhrase.mockRejectedValue("Incorrect password. Seed phrase not deleted.");
 
       render(() => <ConfirmDeleteSeedModal {...defaultProps} />);
@@ -142,12 +142,9 @@ describe("ConfirmDeleteSeedModal", () => {
         if (form) {
           fireEvent.submit(form);
 
-          await waitFor(
-            () => {
-              expect(mockToast.error).toHaveBeenCalledWith("Incorrect password. Seed phrase not deleted.");
-            },
-            { timeout: 5000 },
-          );
+          await waitFor(() => {
+            expect(document.body.textContent).toContain("Incorrect password. Seed phrase not deleted.");
+          });
         }
       }
     });

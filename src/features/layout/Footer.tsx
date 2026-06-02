@@ -1,8 +1,10 @@
 import type { Component } from "solid-js";
-import { createSignal, createEffect, onCleanup, Show } from "solid-js";
+import { createSignal, createEffect, createResource, onCleanup, Show } from "solid-js";
 import { Icon } from "../../components";
 import { t } from "../../stores/i18nStore";
 import { platformCapabilities } from "../../stores/platformStore";
+import { vaultState } from "../../stores/vaultStore";
+import { listEntries } from "../entries/ipc";
 import { openOsNetworkSettings } from "../settings/preferencesIpc";
 import styles from "./Footer.module.css";
 
@@ -10,6 +12,20 @@ export const Footer: Component = () => {
   const [popoverOpen, setPopoverOpen] = createSignal(false);
 
   const togglePopover = () => setPopoverOpen(!popoverOpen());
+
+  // Entry count: load the vault's entries while unlocked. The Footer only
+  // mounts inside the unlocked layout, so this resolves the real total.
+  // Keyed on vault state so it refetches on re-unlock and clears on lock.
+  const [entries] = createResource(
+    () => vaultState() === "unlocked",
+    (unlocked) => (unlocked ? listEntries() : Promise.resolve([])),
+  );
+  const entryCountLabel = () => {
+    const count = entries()?.length ?? 0;
+    return count === 0
+      ? t("footer.entryCountZero")
+      : t("footer.entryCount", { count: String(count) });
+  };
 
   const handleVerify = async () => {
     try {
@@ -90,7 +106,7 @@ export const Footer: Component = () => {
           </div>
         </Show>
       </div>
-      <span class={styles.entryCount}>{t("footer.entryCountZero")}</span>
+      <span class={styles.entryCount}>{entryCountLabel()}</span>
       <span class={styles.version}>{t("footer.version")}</span>
     </footer>
   );

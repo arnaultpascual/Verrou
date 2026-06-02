@@ -12,6 +12,24 @@ vi.mock("../../../stores/platformStore", () => ({
   initPlatformCapabilities: vi.fn(),
 }));
 
+// Mock vaultStore — Footer only renders when unlocked, so report unlocked.
+vi.mock("../../../stores/vaultStore", () => ({
+  vaultState: () => "unlocked",
+}));
+
+// Mock entries IPC — drive the Footer's entry count deterministically.
+const mockListEntries = vi.fn(() =>
+  Promise.resolve([
+    { id: "1", name: "A" },
+    { id: "2", name: "B" },
+    { id: "3", name: "C" },
+  ]),
+);
+
+vi.mock("../../../features/entries/ipc", () => ({
+  listEntries: () => mockListEntries(),
+}));
+
 // Mock preferencesIpc — capture openOsNetworkSettings calls
 const mockOpenOsNetworkSettings = vi.fn(() => Promise.resolve());
 
@@ -33,6 +51,11 @@ import { Footer } from "../../../features/layout/Footer";
 describe("Footer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockListEntries.mockResolvedValue([
+      { id: "1", name: "A" },
+      { id: "2", name: "B" },
+      { id: "3", name: "C" },
+    ]);
   });
 
   it("renders footer element", () => {
@@ -62,9 +85,16 @@ describe("Footer", () => {
     expect(svg).not.toBeNull();
   });
 
-  it("renders entry count", () => {
-    const { getByText } = render(() => <Footer />);
-    expect(getByText("0 entries")).toBeDefined();
+  it("renders the real entry count using the plural string", async () => {
+    const { findByText } = render(() => <Footer />);
+    // Resolves once the createResource(listEntries) settles.
+    expect(await findByText("3 entries")).toBeDefined();
+  });
+
+  it("falls back to the zero string when the vault has no entries", async () => {
+    mockListEntries.mockResolvedValue([]);
+    const { findByText } = render(() => <Footer />);
+    expect(await findByText("0 entries")).toBeDefined();
   });
 
   it("clicking badge opens popover with explanation text", async () => {

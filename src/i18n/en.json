@@ -1388,6 +1388,10 @@
     "pinError": "Failed to update pin status",
     "ariaSearchResults": "Search results",
     "ariaUnlockBiometric": "Unlock with {{provider}}",
+    "ariaPin": "Pin this entry",
+    "ariaUnpin": "Unpin this entry",
+    "ariaPinnedSuffix": "pinned",
+    "entryFallback": "Entry",
     "biometric": "Unlock with biometric",
     "codeCopied": "{{name}} copied",
     "copyCodeFailed": "Could not copy code",
@@ -1468,7 +1472,13 @@
     "newFolderPlaceholder": "Folder name...",
     "rename": "Rename",
     "delete": "Delete",
-    "namePlaceholder": "Folder name..."
+    "namePlaceholder": "Folder name...",
+    "renameAria": "Rename folder {{name}}",
+    "deleteAria": "Delete folder {{name}}",
+    "confirmDelete": "Delete folder \"{{name}}\"? Entries inside won't be deleted.",
+    "createError": "Failed to create folder.",
+    "renameError": "Failed to rename folder.",
+    "deleteError": "Failed to delete folder."
   },
   "attachments": {
     "title": "Attachments",
@@ -1521,7 +1531,8 @@
       "description": "This action requires re-authentication for your security.",
       "passwordLabel": "Master Password",
       "passwordPlaceholder": "Enter your master password",
-      "passwordRequired": "Password is required."
+      "passwordRequired": "Password is required.",
+      "failed": "Verification failed. Check your password and try again."
     },
     "templates": {
       "galleryTitle": "Entry Templates",

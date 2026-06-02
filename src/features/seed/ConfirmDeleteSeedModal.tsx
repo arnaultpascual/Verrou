@@ -26,18 +26,16 @@ export const ConfirmDeleteSeedModal: Component<ConfirmDeleteSeedModalProps> = (p
   };
 
   const handleVerified = async (password: string) => {
-    setShowReAuth(false);
     setIsDeleting(true);
     try {
+      // Throws on wrong password — ReAuthPrompt shows the error inline.
       await deleteSeedPhrase(props.entryId, password);
-      toast.success(t("seed.delete.success", { name: props.walletName }));
-      props.onDeleted();
-    } catch (err) {
-      const msg = typeof err === "string" ? err : t("seed.delete.error");
-      toast.error(msg);
     } finally {
       setIsDeleting(false);
     }
+    setShowReAuth(false);
+    toast.success(t("seed.delete.success", { name: props.walletName }));
+    props.onDeleted();
   };
 
   const handleCancel = () => {

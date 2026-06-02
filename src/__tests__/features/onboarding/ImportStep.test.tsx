@@ -25,7 +25,7 @@ vi.mock("../../../components", async (importOriginal) => {
 const mockImportWizard = vi.fn();
 let capturedOnComplete: ((count?: number) => void) | null = null;
 vi.mock("../../../features/import/ImportWizard", () => ({
-  ImportWizard: (props: { onComplete: (count?: number) => void; onCancel: () => void; embedded?: boolean }) => {
+  ImportWizard: (props: { onComplete: (count?: number) => void; onCancel: () => void }) => {
     mockImportWizard(props);
     capturedOnComplete = props.onComplete;
     return (
@@ -139,21 +139,6 @@ describe("ImportStep", () => {
         expect(queryByText("Import Existing Entries")).toBeNull();
         expect(queryByText(/import 2FA codes from other apps/)).toBeNull();
         expect(queryByText("Start with empty vault")).toBeNull();
-      });
-    });
-
-    it("passes embedded prop to ImportWizard", async () => {
-      const { container } = renderImportStep();
-      const buttons = container.querySelectorAll("button");
-      const importBtn = Array.from(buttons).find(
-        (b) => b.textContent?.includes("Import from another app")
-      );
-      fireEvent.click(importBtn!);
-
-      await waitFor(() => {
-        expect(mockImportWizard).toHaveBeenCalledWith(
-          expect.objectContaining({ embedded: true }),
-        );
       });
     });
 

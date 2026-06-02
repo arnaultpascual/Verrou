@@ -5,12 +5,16 @@
  * - "All Entries" item (clears folder filter)
  * - Folder list with entry counts
  * - "New Folder" inline input (Enter to create)
- * - Hover actions: rename (inline edit), delete (with confirmation)
+ * - Hover/focus actions: rename (inline edit), delete (inline confirm)
+ *
+ * Failures surface via toast; deletes require an inline confirmation
+ * (entries inside the folder are moved to "All", never deleted).
  */
 
 import type { Component } from "solid-js";
 import { For, Show, createSignal, createResource } from "solid-js";
 import { Icon } from "../../components/Icon";
+import { useToast } from "../../components/useToast";
 import { listFolders, createFolder, renameFolder, deleteFolder, type FolderWithCountDto } from "./ipc";
 import { t } from "../../stores/i18nStore";
 import styles from "./FolderSection.module.css";
@@ -22,11 +26,13 @@ export interface FolderSectionProps {
 }
 
 export const FolderSection: Component<FolderSectionProps> = (props) => {
+  const toast = useToast();
   const [folders, { refetch }] = createResource(listFolders);
   const [creating, setCreating] = createSignal(false);
   const [newName, setNewName] = createSignal("");
   const [renamingId, setRenamingId] = createSignal<string | null>(null);
   const [renameValue, setRenameValue] = createSignal("");
+  const [confirmDeleteId, setConfirmDeleteId] = createSignal<string | null>(null);
 
   const handleCreateStart = () => {
     setCreating(true);
@@ -42,8 +48,9 @@ export const FolderSection: Component<FolderSectionProps> = (props) => {
     try {
       await createFolder(name);
       refetch();
-    } catch {
-      // Silently fail — toast would require prop drilling
+    } catch (err) {
+      const msg = typeof err === "string" ? err : t("folders.createError");
+      toast.error(msg);
     }
     setCreating(false);
     setNewName("");
@@ -73,8 +80,9 @@ export const FolderSection: Component<FolderSectionProps> = (props) => {
     try {
       await renameFolder(id, name);
       refetch();
-    } catch {
-      // Silently fail
+    } catch (err) {
+      const msg = typeof err === "string" ? err : t("folders.renameError");
+      toast.error(msg);
     }
     setRenamingId(null);
   };
@@ -91,12 +99,14 @@ export const FolderSection: Component<FolderSectionProps> = (props) => {
   const handleDelete = async (folderId: string) => {
     try {
       await deleteFolder(folderId);
+      setConfirmDeleteId(null);
       if (props.selectedFolderId === folderId) {
         props.onSelectFolder(null);
       }
       refetch();
-    } catch {
-      // Silently fail
+    } catch (err) {
+      const msg = typeof err === "string" ? err : t("folders.deleteError");
+      toast.error(msg);
     }
   };
 
@@ -135,33 +145,62 @@ export const FolderSection: Component<FolderSectionProps> = (props) => {
                     />
                   }
                 >
-                  <div
-                    class={`${styles.folderItem} ${props.selectedFolderId === folder.id ? styles.active : ""}`}
-                    onClick={() => props.onSelectFolder(folder.id)}
-                    role="button"
-                    tabindex={0}
-                    onKeyDown={(e) => { if (e.key === "Enter") props.onSelectFolder(folder.id); }}
+                  <Show
+                    when={confirmDeleteId() !== folder.id}
+                    fallback={
+                      <div class={styles.confirmOverlay}>
+                        <span class={styles.confirmText}>
+                          {t("folders.confirmDelete", { name: folder.name })}
+                        </span>
+                        <div class={styles.confirmActions}>
+                          <button
+                            class={`${styles.confirmBtn} ${styles.confirmBtnDanger}`}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(folder.id); }}
+                          >
+                            {t("common.delete")}
+                          </button>
+                          <button
+                            class={styles.confirmBtn}
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                          >
+                            {t("common.cancel")}
+                          </button>
+                        </div>
+                      </div>
+                    }
                   >
-                    <Icon name="folder" size={14} />
-                    <span class={styles.folderName}>{folder.name}</span>
-                    <span class={styles.folderCount}>{folder.entryCount}</span>
-                    <div class={styles.hoverActions}>
-                      <button
-                        class={styles.actionBtn}
-                        title={t("folders.rename")}
-                        onClick={(e) => { e.stopPropagation(); handleRenameStart(folder); }}
-                      >
-                        <Icon name="edit" size={12} />
-                      </button>
-                      <button
-                        class={styles.actionBtn}
-                        title={t("folders.delete")}
-                        onClick={(e) => { e.stopPropagation(); handleDelete(folder.id); }}
-                      >
-                        <Icon name="x" size={12} />
-                      </button>
+                    <div
+                      class={`${styles.folderItem} ${props.selectedFolderId === folder.id ? styles.active : ""}`}
+                      onClick={() => props.onSelectFolder(folder.id)}
+                      role="button"
+                      tabindex={0}
+                      onKeyDown={(e) => { if (e.key === "Enter") props.onSelectFolder(folder.id); }}
+                    >
+                      <Icon name="folder" size={14} />
+                      <span class={styles.folderName}>{folder.name}</span>
+                      <span class={styles.folderCount}>{folder.entryCount}</span>
+                      <div class={styles.hoverActions}>
+                        <button
+                          class={styles.actionBtn}
+                          title={t("folders.rename")}
+                          aria-label={t("folders.renameAria", { name: folder.name })}
+                          onClick={(e) => { e.stopPropagation(); handleRenameStart(folder); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
+                        >
+                          <Icon name="edit" size={12} />
+                        </button>
+                        <button
+                          class={styles.actionBtn}
+                          title={t("folders.delete")}
+                          aria-label={t("folders.deleteAria", { name: folder.name })}
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(folder.id); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
+                        >
+                          <Icon name="x" size={12} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </Show>
                 </Show>
               </li>
             )}

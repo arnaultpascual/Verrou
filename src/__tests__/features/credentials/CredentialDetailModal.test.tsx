@@ -147,7 +147,7 @@ describe("CredentialDetailModal", () => {
   });
 
   describe("reveal flow", () => {
-    it("shows toast error when reveal fails", async () => {
+    it("shows inline error when reveal fails", async () => {
       mockRevealPassword.mockRejectedValue("Incorrect password. Credential not revealed.");
 
       render(() => <CredentialDetailModal {...defaultProps} />);
@@ -167,14 +167,11 @@ describe("CredentialDetailModal", () => {
         const form = document.querySelector("form");
         if (form) {
           fireEvent.submit(form);
-          await waitFor(
-            () => {
-              expect(mockToast.error).toHaveBeenCalledWith(
-                "Incorrect password. Credential not revealed.",
-              );
-            },
-            { timeout: 5000 },
-          );
+          await waitFor(() => {
+            expect(document.body.textContent).toContain(
+              "Incorrect password. Credential not revealed.",
+            );
+          });
         }
       }
     });

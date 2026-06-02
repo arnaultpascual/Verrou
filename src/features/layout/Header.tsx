@@ -77,7 +77,7 @@ export const Header: Component = () => {
       </div>
       <div class={styles.actions}>
         <Show when={vaultState() === "unlocked"}>
-          <ShortcutTooltip shortcut="Ctrl+Shift+L">
+          <ShortcutTooltip shortcut="Ctrl+L">
             <button
               class={styles.lockBtn}
               onClick={handleLock}

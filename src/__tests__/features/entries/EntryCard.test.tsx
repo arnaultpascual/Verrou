@@ -337,9 +337,9 @@ describe("EntryCard", () => {
       expect(masked).toBeTruthy();
     });
 
-    it("shows word count", () => {
+    it("does not show a hardcoded word count (real count is not in list metadata)", () => {
       render(() => <EntryCard entry={seedEntry} />);
-      expect(document.body.textContent).toContain("24 words");
+      expect(document.body.textContent).not.toContain("24 words");
     });
   });
 

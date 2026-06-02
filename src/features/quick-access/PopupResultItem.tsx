@@ -3,6 +3,7 @@ import { Show } from "solid-js";
 import type { EntryMetadataDto } from "../entries/ipc";
 import { TypeBadge } from "../entries/TypeBadge";
 import { Icon } from "../../components/Icon";
+import { t } from "../../stores/i18nStore";
 import styles from "./PopupResultItem.module.css";
 
 export interface PopupResultItemProps {
@@ -39,7 +40,7 @@ export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
       <Show when={props.onTogglePin}>
         <button
           class={`${styles.pinToggle} ${props.entry.pinned ? styles.pinTogglePinned : ""}`}
-          aria-label={props.entry.pinned ? "Unpin this entry" : "Pin this entry"}
+          aria-label={props.entry.pinned ? t("quickAccess.ariaUnpin") : t("quickAccess.ariaPin")}
           data-testid="popup-pin-toggle"
           onClick={(e) => {
             e.stopPropagation();
@@ -61,9 +62,9 @@ export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
 };
 
 function buildAriaLabel(entry: EntryMetadataDto): string {
-  const parts = [entry.name];
+  const parts = [entry.name || t("quickAccess.entryFallback")];
   if (entry.issuer) parts.push(entry.issuer);
   parts.push(entry.entryType);
-  if (entry.pinned) parts.push("pinned");
+  if (entry.pinned) parts.push(t("quickAccess.ariaPinnedSuffix"));
   return parts.join(", ");
 }

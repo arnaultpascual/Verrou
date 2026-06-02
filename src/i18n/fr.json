@@ -1388,6 +1388,10 @@
     "pinError": "Échec de la mise à jour de l'épingle",
     "ariaSearchResults": "Résultats de recherche",
     "ariaUnlockBiometric": "Déverrouiller avec {{provider}}",
+    "ariaPin": "Épingler cette entrée",
+    "ariaUnpin": "Désépingler cette entrée",
+    "ariaPinnedSuffix": "épinglé",
+    "entryFallback": "Entrée",
     "biometric": "Déverrouiller avec la biométrie",
     "codeCopied": "{{name}} copié",
     "copyCodeFailed": "Impossible de copier le code",
@@ -1468,7 +1472,13 @@
     "newFolderPlaceholder": "Nom du dossier…",
     "rename": "Renommer",
     "delete": "Supprimer",
-    "namePlaceholder": "Nom du dossier…"
+    "namePlaceholder": "Nom du dossier…",
+    "renameAria": "Renommer le dossier {{name}}",
+    "deleteAria": "Supprimer le dossier {{name}}",
+    "confirmDelete": "Supprimer le dossier « {{name}} » ? Les entrées qu'il contient ne seront pas supprimées.",
+    "createError": "Échec de la création du dossier.",
+    "renameError": "Échec du renommage du dossier.",
+    "deleteError": "Échec de la suppression du dossier."
   },
   "attachments": {
     "title": "Pièces jointes",
@@ -1521,7 +1531,8 @@
       "description": "Cette action nécessite une ré-authentification pour votre sécurité.",
       "passwordLabel": "Mot de passe maître",
       "passwordPlaceholder": "Saisissez votre mot de passe maître",
-      "passwordRequired": "Le mot de passe est requis."
+      "passwordRequired": "Le mot de passe est requis.",
+      "failed": "La vérification a échoué. Vérifiez votre mot de passe et réessayez."
     },
     "templates": {
       "galleryTitle": "Modèles d'entrées",

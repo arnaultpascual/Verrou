@@ -122,6 +122,28 @@ describe("Header", () => {
     });
   });
 
+  it("lock button tooltip shows the in-window shortcut (Ctrl+L, no Shift)", async () => {
+    // The header lock button is an IN-WINDOW action; its tooltip must match the
+    // in-window keyboard handler in ProtectedLayout (Cmd/Ctrl+L, no Shift) — not
+    // the user-configurable GLOBAL hotkey (CmdOrCtrl+Shift+L).
+    setVaultState("unlocked");
+    const { getByLabelText } = renderHeader();
+    // ShortcutTooltip wraps the trigger in a <span>; hover it to open the tooltip.
+    const trigger = getByLabelText("Lock vault").closest("span");
+    expect(trigger).not.toBeNull();
+    fireEvent.pointerEnter(trigger!);
+
+    await vi.waitFor(
+      () => {
+        const tooltipEl = document.body.querySelector("[role='tooltip']");
+        expect(tooltipEl).not.toBeNull();
+        expect(tooltipEl!.textContent).toContain("Ctrl+L");
+        expect(tooltipEl!.textContent).not.toContain("Shift");
+      },
+      { timeout: 2000 },
+    );
+  });
+
   // -- Search input tests (Story 3.6) ------------------------------------
 
   describe("search input", () => {

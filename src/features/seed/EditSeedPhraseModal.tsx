@@ -44,11 +44,6 @@ export const EditSeedPhraseModal: Component<EditSeedPhraseModalProps> = (props) 
   const [form, setForm] = createStore<EditSeedFormState>({ ...INITIAL_FORM });
   const [wordCount, setWordCount] = createSignal(0);
 
-  // Track original passphrase state for tri-state change detection.
-  // NOTE: Always false until the backend exposes `hasPassphrase` in EntryDetailDto.
-  // When that's added, convert to: const [originalHasPassphrase, setOriginalHasPassphrase] = createSignal(false);
-  let originalHasPassphrase = false;
-
   // Fetch entry detail when modal opens
   const [entryDetail] = createResource(
     () => (props.open ? props.entryId : undefined),
@@ -63,15 +58,13 @@ export const EditSeedPhraseModal: Component<EditSeedPhraseModalProps> = (props) 
       const words = entry.secret ? entry.secret.split(" ") : [];
       setWordCount(words.length);
 
-      // Detect if entry has a passphrase (convention: passphrase stored after a tab separator)
-      // In production, the backend would return this metadata; for mock, we don't have it
-      originalHasPassphrase = false;
-
       setForm({
         name: entry.name,
         issuer: entry.issuer ?? "",
         pinned: entry.pinned,
-        hasPassphrase: originalHasPassphrase,
+        // We can't tell from list/detail metadata whether a passphrase already
+        // exists, so the toggle starts unchecked and acts as "set / replace".
+        hasPassphrase: false,
         passphrase: "",
         isSubmitting: false,
         errors: {},
@@ -110,21 +103,18 @@ export const EditSeedPhraseModal: Component<EditSeedPhraseModalProps> = (props) 
   };
 
   /**
-   * Compute passphrase tri-state for the update request:
-   * - undefined = no change
-   * - null = remove passphrase
-   * - string = set new passphrase
+   * Compute the passphrase change for the update request:
+   * - undefined = no change (any existing passphrase is preserved)
+   * - string = set / replace the passphrase
+   *
+   * Removing a passphrase isn't offered here: the metadata read can't tell us
+   * whether one already exists, so the toggle is "set/replace" only. Passphrase
+   * removal is handled by the reveal-to-load seed editor (Phase D).
    */
-  const computePassphraseValue = (): string | null | undefined => {
-    if (!form.hasPassphrase && originalHasPassphrase) {
-      // User unchecked the passphrase box → remove
-      return null;
-    }
+  const computePassphraseValue = (): string | undefined => {
     if (form.hasPassphrase && form.passphrase) {
-      // User set or changed passphrase
       return form.passphrase;
     }
-    // No change
     return undefined;
   };
 

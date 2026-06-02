@@ -140,7 +140,7 @@ describe("SeedPhraseDetailModal", () => {
   });
 
   describe("error handling", () => {
-    it("shows toast error when reveal fails with string error", async () => {
+    it("shows inline error when reveal fails with string error", async () => {
       mockRevealSeedPhrase.mockRejectedValue("Incorrect password. Seed phrase not revealed.");
 
       render(() => <SeedPhraseDetailModal {...defaultProps} />);
@@ -163,17 +163,13 @@ describe("SeedPhraseDetailModal", () => {
         if (form) {
           fireEvent.submit(form);
 
-          // Wait for SecurityCeremony to complete and trigger onVerified
-          // The ReAuthPrompt simulates a 3s ceremony animation, so we need
-          // to give it time to complete
-          await waitFor(
-            () => {
-              expect(mockToast.error).toHaveBeenCalledWith(
-                "Incorrect password. Seed phrase not revealed.",
-              );
-            },
-            { timeout: 5000 },
-          );
+          // ReAuthPrompt awaits the real reveal; on failure it surfaces the
+          // error INLINE and stays open (the caller no longer toasts).
+          await waitFor(() => {
+            expect(document.body.textContent).toContain(
+              "Incorrect password. Seed phrase not revealed.",
+            );
+          });
         }
       }
     });

@@ -68,11 +68,14 @@
   gap: 2px;
 }
 
-.folderItem:hover .hoverActions {
+/* Reveal actions on hover OR keyboard focus (a11y: focusable buttons). */
+.folderItem:hover .hoverActions,
+.folderItem:focus-within .hoverActions {
   display: flex;
 }
 
-.folderItem:hover .folderCount {
+.folderItem:hover .folderCount,
+.folderItem:focus-within .folderCount {
   display: none;
 }
 
@@ -93,6 +96,12 @@
 .actionBtn:hover {
   color: var(--color-text-primary);
   background-color: var(--color-surface-2);
+}
+
+.actionBtn:focus-visible {
+  outline: none;
+  color: var(--color-text-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 /* ── Inline Input (new folder / rename) ── */
@@ -126,4 +135,62 @@
 
 .newFolderBtn:hover {
   color: var(--color-text-primary);
+}
+
+/* ── Inline Delete Confirm ── */
+
+.confirmOverlay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-surface-3);
+  border-radius: var(--border-radius-sm);
+}
+
+.confirmText {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-normal);
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.confirmBtn {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background-color: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--easing-default),
+    background-color var(--duration-fast) var(--easing-default);
+}
+
+.confirmBtn:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-1);
+}
+
+.confirmBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.confirmBtnDanger {
+  color: var(--color-danger);
+}
+
+.confirmBtnDanger:hover {
+  color: var(--color-text-inverse);
+  background-color: var(--color-danger);
+}
+
+.confirmBtnDanger:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-danger-focus-ring);
 }

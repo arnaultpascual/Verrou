@@ -146,19 +146,15 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
   };
 
   const handleVerified = async (password: string) => {
-    setShowReAuth(false);
-    try {
-      const data = await revealPassword(props.entryId, password);
-      setRevealedData(data);
-      startAutoHide();
-      // Start TOTP polling if linked
-      if (data.linkedTotpId) {
-        startTotpPolling(data.linkedTotpId);
-      }
-    } catch (err) {
-      const msg = typeof err === "string" ? err : t("credentials.detail.revealError");
-      toast.error(msg);
+    // Throws on wrong password — ReAuthPrompt shows the error inline and retries.
+    const data = await revealPassword(props.entryId, password);
+    setRevealedData(data);
+    startAutoHide();
+    // Start TOTP polling if linked
+    if (data.linkedTotpId) {
+      startTotpPolling(data.linkedTotpId);
     }
+    setShowReAuth(false);
   };
 
   const handleHide = () => {
