@@ -21,7 +21,7 @@
 .codeInput {
   font-family: var(--font-mono);
   font-size: var(--font-size-lg);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-secondary);
   border: var(--border-default);
@@ -38,7 +38,7 @@
 
 .codeInput::placeholder {
   color: var(--color-text-tertiary);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--letter-spacing-xs);
 }
 
 .codeHint {
@@ -107,14 +107,14 @@
   max-width: 320px;
   height: 6px;
   background: var(--color-bg-secondary);
-  border-radius: 3px;
+  border-radius: var(--border-radius-xs);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
   background: var(--color-primary);
-  border-radius: 3px;
+  border-radius: var(--border-radius-xs);
   transition: width var(--duration-normal) var(--easing-default);
 }
 
@@ -153,7 +153,7 @@
 .successMessage {
   color: var(--color-text-primary);
   font-size: var(--font-size-md);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   text-align: center;
   margin: 0;
 }

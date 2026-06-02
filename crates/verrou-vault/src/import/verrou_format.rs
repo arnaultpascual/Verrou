@@ -18,14 +18,23 @@ use rusqlite::params;
 use serde::Serialize;
 use zeroize::Zeroize;
 
+/// Maximum allowed size (in bytes) for a single attachment in an import file.
+///
+/// Must match the `MAX_FILE_SIZE` limit enforced by `attachments.rs` so that
+/// oversized data is rejected *before* any allocation is retained, preventing
+/// denial-of-service via a crafted export file with a giant `data` field.
+const IMPORT_MAX_ATTACHMENT_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
+
 use verrou_crypto_core::kdf;
-use verrou_crypto_core::memory::SecretBytes;
+use verrou_crypto_core::memory::{SecretBuffer, SecretBytes};
 use verrou_crypto_core::slots::{self, SlotType};
 use verrou_crypto_core::vault_format::{self, FORMAT_VERSION};
+use verrou_crypto_core::{kem, signing, symmetric};
 
 use crate::attachments;
 use crate::entries::{self, AddEntryParams};
 use crate::error::VaultError;
+use crate::export::envelope::{self, KEM_CEK_AAD, VAULT_KEM_CONTEXT};
 use crate::export::verrou_format::{ExportPayload, ExportedEntry};
 use crate::folders;
 use crate::lifecycle;
@@ -113,21 +122,29 @@ pub struct VerrouImportResult {
 
 /// Validate and preview a `.verrou` import file.
 ///
-/// Decrypts the file with the provided password, checks format version
+/// Decrypts the file (envelope or legacy raw format), checks format version
 /// compatibility, and detects duplicate entries against the current vault.
+///
+/// `vault_master_key` is the *importing* vault's master key (the unlocked
+/// session). When the import file is a post-quantum envelope produced by the
+/// same vault, the content key is recovered via the KEM path (no password
+/// needed); otherwise the password slot is used. Pass `None` to force the
+/// password path (e.g. when no session is available).
 ///
 /// # Errors
 ///
 /// - [`VaultError::InvalidPassword`] if the password is incorrect
-/// - [`VaultError::Import`] if the file format is invalid or version is too new
+/// - [`VaultError::Import`] if the file format is invalid, the envelope
+///   signature fails (fail-closed), or the version is too new
 /// - [`VaultError::Crypto`] if decryption fails
 pub fn validate_verrou_import(
     conn: &rusqlite::Connection,
     file_data: &[u8],
     import_password: &[u8],
+    vault_master_key: Option<&SecretBytes<32>>,
 ) -> Result<VerrouImportPreview, VaultError> {
     // Step 1: Parse and decrypt the file.
-    let payload = decrypt_import_file(file_data, import_password)?;
+    let payload = decrypt_import_file(file_data, import_password, vault_master_key)?;
 
     // Step 2: Build entry previews.
     let entries: Vec<VerrouEntryPreview> = payload
@@ -174,7 +191,8 @@ pub fn validate_verrou_import(
 /// # Errors
 ///
 /// - [`VaultError::InvalidPassword`] if the import file password is incorrect
-/// - [`VaultError::Import`] if the file format is invalid
+/// - [`VaultError::Import`] if the file format is invalid (or, for an envelope,
+///   the signature fails to verify — fail-closed before any decryption)
 /// - [`VaultError::Database`] if the transaction fails (fully rolled back)
 pub fn import_verrou_file(
     conn: &rusqlite::Connection,
@@ -184,8 +202,9 @@ pub fn import_verrou_file(
     vault_dir: &Path,
     duplicate_mode: DuplicateMode,
 ) -> Result<VerrouImportResult, VaultError> {
-    // Step 1: Re-decrypt the import file.
-    let payload = decrypt_import_file(file_data, import_password)?;
+    // Step 1: Re-decrypt the import file. The current vault's master key enables
+    // the KEM recovery path when importing an envelope this vault produced.
+    let payload = decrypt_import_file(file_data, import_password, Some(master_key))?;
 
     // Step 2: Create backup before modifying the vault.
     lifecycle::create_backup(vault_dir)?;
@@ -196,14 +215,15 @@ pub fn import_verrou_file(
         .map_err(|e| VaultError::Database(format!("failed to begin import transaction: {e}")))?;
 
     // Step 4: Import folders (with ID remapping).
-    let folder_map = import_folders(conn, &payload)?;
+    // All writes go through &tx so they participate in the explicit transaction.
+    let folder_map = import_folders(&tx, &payload)?;
 
     // Step 5: Import entries (with duplicate handling).
     let (entry_map, entry_stats) =
-        import_entries(conn, master_key, &payload, &folder_map, duplicate_mode)?;
+        import_entries(&tx, master_key, &payload, &folder_map, duplicate_mode)?;
 
     // Step 6: Import attachments (with entry ID remapping).
-    let attachment_count = import_attachments(conn, master_key, &payload, &entry_map)?;
+    let attachment_count = import_attachments(&tx, master_key, &payload, &entry_map)?;
 
     // Step 7: Commit transaction.
     tx.commit()
@@ -223,12 +243,110 @@ pub fn import_verrou_file(
 // ---------------------------------------------------------------------------
 
 /// Decrypt and parse a `.verrou` import file.
+///
+/// Verrou exports are always post-quantum envelopes (magic `VRENV1`): the
+/// signature is verified **fail-closed** before any decryption, then the
+/// content key is recovered via the KEM path when `vault_master_key` matches
+/// the source vault, otherwise via the password slot inside the inner blob.
+/// A non-envelope file is rejected — there is no pre-launch installed base of
+/// the old raw `vault_format` export, so a mandatory envelope guarantees every
+/// import is signature-verified and KEM-wrapped.
 fn decrypt_import_file(
     file_data: &[u8],
     import_password: &[u8],
+    vault_master_key: Option<&SecretBytes<32>>,
 ) -> Result<ExportPayload, VaultError> {
-    // Parse header to check version and find password slot.
-    let header = vault_format::parse_header_only(file_data)?;
+    // Verrou exports are always PQ envelopes. Reject anything else: a mandatory
+    // envelope guarantees every import is signature-verified and KEM-wrapped.
+    if !envelope::has_envelope_magic(file_data) {
+        return Err(VaultError::Import(
+            "not a valid Verrou export (missing post-quantum envelope)".into(),
+        ));
+    }
+    decrypt_envelope_import(file_data, import_password, vault_master_key)
+}
+
+/// Decrypt a post-quantum export envelope.
+///
+/// Verifies the hybrid signature over the signed portion with the embedded
+/// public key (fail-closed) *before* touching any ciphertext, then recovers the
+/// content key via KEM (if the importing vault's master key matches the source
+/// vault) or the inner password slot, and finally deserializes the inner blob.
+fn decrypt_envelope_import(
+    file_data: &[u8],
+    import_password: &[u8],
+    vault_master_key: Option<&SecretBytes<32>>,
+) -> Result<ExportPayload, VaultError> {
+    // Parse structure (bounds-checked, no trust placed in contents yet).
+    let parsed = envelope::parse_envelope(file_data)?;
+
+    // FAIL-CLOSED: verify the hybrid signature before any decryption. A failure
+    // here aborts the import without ever processing the inner blob.
+    signing::verify(
+        parsed.signed_portion,
+        &parsed.signature,
+        &parsed.signing_public,
+    )
+    .map_err(|_| VaultError::Import("export envelope signature verification failed".into()))?;
+
+    // Recover the export content key (CEK): prefer the KEM path when the
+    // importing vault's master key reproduces the source vault's KEM key pair.
+    let content_key = recover_content_key(&parsed, import_password, vault_master_key)?;
+
+    deserialize_inner_blob(parsed.inner_blob, content_key.expose())
+}
+
+/// Recover the export content key for an envelope.
+///
+/// Tries the KEM path first (decapsulate with the importing vault's derived KEM
+/// private key, then AEAD-unwrap the sealed CEK). If no master key is supplied,
+/// or the KEM path fails (e.g. the envelope came from a *different* vault), it
+/// falls back to the inner blob's password slot.
+fn recover_content_key(
+    parsed: &envelope::ParsedEnvelope<'_>,
+    import_password: &[u8],
+    vault_master_key: Option<&SecretBytes<32>>,
+) -> Result<SecretBuffer, VaultError> {
+    if let Some(master_key) = vault_master_key {
+        if let Some(cek) = try_recover_content_key_via_kem(parsed, master_key.expose()) {
+            return Ok(cek);
+        }
+    }
+
+    // Fall back to the password slot inside the inner blob (cross-vault import
+    // or no session key available).
+    let import_master_key = recover_password_slot_key(parsed.inner_blob, import_password)?;
+    Ok(import_master_key)
+}
+
+/// Attempt KEM-based content-key recovery.
+///
+/// Returns `Some(cek)` only if both decapsulation produces a shared secret AND
+/// the wrapped CEK authenticates under it (correct vault). Returns `None` on
+/// any failure so the caller can fall back to the password path. Errors are
+/// intentionally swallowed here — a mismatch is an expected, benign outcome
+/// when importing another vault's export.
+fn try_recover_content_key_via_kem(
+    parsed: &envelope::ParsedEnvelope<'_>,
+    master_key: &[u8],
+) -> Option<SecretBuffer> {
+    let kem_keypair = kem::derive_keypair(master_key, VAULT_KEM_CONTEXT).ok()?;
+    let shared_secret = kem::decapsulate(&parsed.kem_ciphertext, &kem_keypair.private).ok()?;
+    // AEAD-unwrap authenticates: a wrong vault yields a different shared secret
+    // and decryption fails, so this returns None and we fall back to password.
+    symmetric::decrypt(&parsed.wrapped_cek, shared_secret.expose(), KEM_CEK_AAD).ok()
+}
+
+/// Recover an inner-blob content key from its password slot.
+///
+/// Shared by the legacy raw-file path and the envelope password fallback.
+/// Validates the version, locates the password slot, derives the wrapping key
+/// via Argon2id, and unwraps the slot.
+fn recover_password_slot_key(
+    inner_blob: &[u8],
+    import_password: &[u8],
+) -> Result<SecretBuffer, VaultError> {
+    let header = vault_format::parse_header_only(inner_blob)?;
 
     // Version compatibility check.
     if header.version > FORMAT_VERSION {
@@ -251,14 +369,35 @@ fn decrypt_import_file(
         .get(slot_index)
         .ok_or_else(|| VaultError::Import("missing salt for password slot".into()))?;
 
-    // Derive wrapping key and recover the import master key.
+    // Derive wrapping key and recover the import content key.
     let wrapping_key = kdf::derive(import_password, salt, &header.session_params)?;
-    let import_master_key = slots::unwrap_slot(password_slot, wrapping_key.expose())
-        .map_err(|_| VaultError::InvalidPassword)?;
+    slots::unwrap_slot(password_slot, wrapping_key.expose())
+        .map_err(|_| VaultError::InvalidPassword)
+}
+
+/// Deserialize an inner `vault_format` blob with a recovered content key into a
+/// validated [`ExportPayload`].
+///
+/// Performs the AEAD payload decryption, JSON parse, payload-version check, and
+/// attachment-size guard. The payload version must still be checked here even
+/// for the legacy path; the header version is checked in
+/// [`recover_password_slot_key`].
+fn deserialize_inner_blob(
+    inner_blob: &[u8],
+    content_key: &[u8],
+) -> Result<ExportPayload, VaultError> {
+    // For the KEM path the header version has not been checked yet, so verify it
+    // here too (cheap, and keeps the envelope path fail-fast on newer formats).
+    let header = vault_format::parse_header_only(inner_blob)?;
+    if header.version > FORMAT_VERSION {
+        return Err(VaultError::Import(
+            "This vault was created with a newer version of VERROU. Please update the application."
+                .to_string(),
+        ));
+    }
 
     // Decrypt the payload.
-    let (_header, payload_bytes) =
-        vault_format::deserialize(file_data, import_master_key.expose())?;
+    let (_header, payload_bytes) = vault_format::deserialize(inner_blob, content_key)?;
 
     // Parse the JSON payload.
     let mut payload_vec = payload_bytes.expose().to_vec();
@@ -275,6 +414,9 @@ fn decrypt_import_file(
             payload.version
         )));
     }
+
+    // M1 — reject oversized attachment data *before* any further processing.
+    check_attachment_sizes(&payload)?;
 
     Ok(payload)
 }
@@ -323,6 +465,31 @@ fn check_verrou_duplicates(
     Ok(duplicates)
 }
 
+/// Validate attachment sizes in a parsed payload.
+///
+/// Rejects any attachment whose decoded `data` exceeds [`IMPORT_MAX_ATTACHMENT_BYTES`]
+/// or whose `size_bytes` field is inconsistent with the actual data length.
+/// Called immediately after JSON deserialization, before any database writes,
+/// to prevent denial-of-service via a crafted export file with an oversized attachment.
+fn check_attachment_sizes(payload: &ExportPayload) -> Result<(), VaultError> {
+    for (i, att) in payload.attachments.iter().enumerate() {
+        if att.data.len() > IMPORT_MAX_ATTACHMENT_BYTES {
+            return Err(VaultError::FileSizeLimitExceeded {
+                max_bytes: IMPORT_MAX_ATTACHMENT_BYTES,
+                actual_bytes: att.data.len(),
+            });
+        }
+        if usize::try_from(att.size_bytes) != Ok(att.data.len()) {
+            return Err(VaultError::Import(format!(
+                "attachment {i}: declared size {} does not match data length {}",
+                att.size_bytes,
+                att.data.len()
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Folder mapping entry — tracks old ID → new ID and whether it was newly created.
 struct FolderMapping {
     new_id: String,
@@ -333,7 +500,7 @@ struct FolderMapping {
 ///
 /// Returns a mapping from old folder ID → new folder ID.
 fn import_folders(
-    conn: &rusqlite::Connection,
+    conn: &rusqlite::Transaction<'_>,
     payload: &ExportPayload,
 ) -> Result<HashMap<String, FolderMapping>, VaultError> {
     let mut folder_map: HashMap<String, FolderMapping> = HashMap::new();
@@ -383,7 +550,7 @@ struct EntryImportStats {
 ///
 /// Returns a mapping from old entry ID → new entry ID, and import statistics.
 fn import_entries(
-    conn: &rusqlite::Connection,
+    conn: &rusqlite::Transaction<'_>,
     master_key: &SecretBytes<32>,
     payload: &ExportPayload,
     folder_map: &HashMap<String, FolderMapping>,
@@ -456,7 +623,7 @@ fn import_entries(
 
 /// Import attachments from the payload with entry ID remapping.
 fn import_attachments(
-    conn: &rusqlite::Connection,
+    conn: &rusqlite::Transaction<'_>,
     master_key: &SecretBytes<32>,
     payload: &ExportPayload,
     entry_map: &HashMap<String, String>,
@@ -483,4 +650,81 @@ fn import_attachments(
     }
 
     Ok(count)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::verrou_format::{ExportPayload, ExportedAttachment};
+
+    /// Build a minimal `ExportPayload` with a single attachment whose `data`
+    /// field has the given byte count.
+    fn make_payload_with_attachment(data_len: usize) -> ExportPayload {
+        let data = vec![0u8; data_len];
+        ExportPayload {
+            version: 1,
+            exported_at: "2024-01-01T00:00:00Z".to_string(),
+            entries: Vec::new(),
+            folders: Vec::new(),
+            attachments: vec![ExportedAttachment {
+                id: "att-1".to_string(),
+                entry_id: "entry-1".to_string(),
+                filename: "test.bin".to_string(),
+                mime_type: "application/octet-stream".to_string(),
+                size_bytes: i64::try_from(data_len).unwrap_or(i64::MAX),
+                data,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn attachment_at_limit_is_accepted() {
+        let payload = make_payload_with_attachment(IMPORT_MAX_ATTACHMENT_BYTES);
+        assert!(check_attachment_sizes(&payload).is_ok());
+    }
+
+    #[test]
+    fn attachment_one_byte_over_limit_is_rejected() {
+        let payload = make_payload_with_attachment(IMPORT_MAX_ATTACHMENT_BYTES + 1);
+        let err = check_attachment_sizes(&payload).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                VaultError::FileSizeLimitExceeded {
+                    max_bytes: IMPORT_MAX_ATTACHMENT_BYTES,
+                    ..
+                }
+            ),
+            "expected FileSizeLimitExceeded, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn attachment_declared_size_mismatch_is_rejected() {
+        let mut payload = make_payload_with_attachment(100);
+        // Tamper: claim a different size than the actual data length.
+        payload.attachments[0].size_bytes = 999;
+        let err = check_attachment_sizes(&payload).unwrap_err();
+        assert!(
+            matches!(err, VaultError::Import(_)),
+            "expected Import error for size mismatch, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn empty_attachments_list_passes() {
+        let payload = ExportPayload {
+            version: 1,
+            exported_at: "2024-01-01T00:00:00Z".to_string(),
+            entries: Vec::new(),
+            folders: Vec::new(),
+            attachments: Vec::new(),
+        };
+        assert!(check_attachment_sizes(&payload).is_ok());
+    }
 }

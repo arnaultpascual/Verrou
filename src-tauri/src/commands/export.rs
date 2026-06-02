@@ -98,13 +98,13 @@ pub async fn export_vault(
                     })
                     .unwrap_or_else(|_| "File system error.".into()))
                 }
-                Err(e) => {
+                Err(_e) => {
                     Err(serde_json::to_string(&UnlockErrorResponse {
                         code: "INTERNAL_ERROR".into(),
-                        message: format!("Export failed: {e}"),
+                        message: "Export failed. Please try again.".into(),
                         remaining_ms: None,
                     })
-                    .unwrap_or_else(|_| "Export failed.".into()))
+                    .unwrap_or_else(|_| "Export failed. Please try again.".into()))
                 }
             }
         };
@@ -115,13 +115,16 @@ pub async fn export_vault(
         let result = result?;
 
         // Write export data to the user-selected path.
-        std::fs::write(&save_path, &result.export_data).map_err(|e| {
+        std::fs::write(&save_path, &result.export_data).map_err(|_e| {
             serde_json::to_string(&UnlockErrorResponse {
                 code: "IO_ERROR".into(),
-                message: format!("Failed to write export file: {e}"),
+                message: "Failed to write export file. Please check disk space and try again."
+                    .into(),
                 remaining_ms: None,
             })
-            .unwrap_or_else(|_| format!("Failed to write export file: {e}"))
+            .unwrap_or_else(|_| {
+                "Failed to write export file. Please check disk space and try again.".into()
+            })
         })?;
 
         Ok(ExportVaultResponse {

@@ -1,4 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! Integration tests for vault export.
 //!
@@ -13,6 +17,7 @@ use verrou_crypto_core::memory::SecretBytes;
 use verrou_crypto_core::slots::{self, SlotType};
 use verrou_crypto_core::vault_format;
 use verrou_vault::error::VaultError;
+use verrou_vault::export::envelope;
 use verrou_vault::export::verrou_format::{export_vault, ExportVaultRequest};
 use verrou_vault::lifecycle::{self, CreateVaultRequest, UnlockVaultRequest};
 use verrou_vault::{add_entry, AddEntryParams, Algorithm, EntryData, EntryType, VaultDb};
@@ -99,9 +104,21 @@ fn note_params(name: &str, content: &str) -> AddEntryParams {
     }
 }
 
+/// Extract the inner `vault_format` blob from a PQ export envelope.
+///
+/// Export now wraps the raw `vault_format` blob in a `VRENV1` envelope; tests
+/// that inspect the inner format unwrap it first.
+fn inner_blob(export_data: &[u8]) -> Vec<u8> {
+    envelope::parse_envelope(export_data)
+        .expect("export must be a valid PQ envelope")
+        .inner_blob
+        .to_vec()
+}
+
 /// Recover the master key from export .verrou bytes using a password.
 fn recover_export_key(export_data: &[u8], password: &[u8]) -> SecretBytes<32> {
-    let header = vault_format::parse_header_only(export_data).expect("export header should parse");
+    let inner = inner_blob(export_data);
+    let header = vault_format::parse_header_only(&inner).expect("export header should parse");
 
     let password_slot = header
         .slots
@@ -187,16 +204,16 @@ fn export_with_entries_produces_valid_verrou_binary() {
     assert_eq!(result.folder_count, 0);
     assert_eq!(result.attachment_count, 0);
 
-    // Verify .verrou magic bytes (VROU).
-    assert_eq!(
-        &result.export_data[..4],
-        b"VROU",
-        "magic bytes must be VROU"
+    // Export is wrapped in a PQ envelope (magic VRENV1), not raw VROU.
+    assert!(
+        envelope::has_envelope_magic(&result.export_data),
+        "export must carry the PQ envelope magic"
     );
 
-    // Verify the header is parseable.
-    let header =
-        vault_format::parse_header_only(&result.export_data).expect("export header should parse");
+    // The inner blob is still a valid VROU file with one password slot.
+    let inner = inner_blob(&result.export_data);
+    assert_eq!(&inner[..4], b"VROU", "inner magic bytes must be VROU");
+    let header = vault_format::parse_header_only(&inner).expect("export header should parse");
     assert_eq!(header.slot_count, 1, "export must have exactly one slot");
     assert_eq!(header.slots[0].slot_type, SlotType::Password);
 }
@@ -271,8 +288,9 @@ fn export_file_can_be_decrypted_with_password() {
     // Recover export master key from password.
     let export_key = recover_export_key(&result.export_data, TEST_PASSWORD);
 
-    // Deserialize full .verrou to get plaintext payload.
-    let (_header, plaintext) = vault_format::deserialize(&result.export_data, export_key.expose())
+    // Deserialize the inner .verrou blob to get the plaintext payload.
+    let inner = inner_blob(&result.export_data);
+    let (_header, plaintext) = vault_format::deserialize(&inner, export_key.expose())
         .expect("deserialization with export key should succeed");
 
     // Parse the JSON payload.
@@ -345,8 +363,8 @@ fn export_includes_folders() {
 
     // Decrypt and verify folder data in payload.
     let export_key = recover_export_key(&result.export_data, TEST_PASSWORD);
-    let (_header, plaintext) =
-        vault_format::deserialize(&result.export_data, export_key.expose()).unwrap();
+    let inner = inner_blob(&result.export_data);
+    let (_header, plaintext) = vault_format::deserialize(&inner, export_key.expose()).unwrap();
     let payload: serde_json::Value = serde_json::from_slice(plaintext.expose()).unwrap();
 
     let folders = payload["folders"]
@@ -420,8 +438,8 @@ fn export_preserves_all_entry_types() {
 
     // Decrypt and verify each entry type preserved.
     let export_key = recover_export_key(&result.export_data, TEST_PASSWORD);
-    let (_header, plaintext) =
-        vault_format::deserialize(&result.export_data, export_key.expose()).unwrap();
+    let inner = inner_blob(&result.export_data);
+    let (_header, plaintext) = vault_format::deserialize(&inner, export_key.expose()).unwrap();
     let payload: serde_json::Value = serde_json::from_slice(plaintext.expose()).unwrap();
 
     let entries = payload["entries"].as_array().unwrap();

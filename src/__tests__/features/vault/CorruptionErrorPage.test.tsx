@@ -12,6 +12,13 @@ const mockToastError = vi.fn();
 vi.mock("../../../features/vault/ipc", () => ({
   listVaultBackups: (...args: unknown[]) => mockListVaultBackups(...args),
   restoreVaultBackup: (...args: unknown[]) => mockRestoreVaultBackup(...args),
+  parseUnlockError: (errorStr: string) => {
+    try {
+      return JSON.parse(errorStr);
+    } catch {
+      return { code: "UNKNOWN", message: errorStr || "An unexpected error occurred." };
+    }
+  },
 }));
 
 // Mock useToast
@@ -35,6 +42,19 @@ function renderCorruptionPage(overrides?: { message?: string; onRestored?: () =>
     onRestored: overrides?.onRestored ?? vi.fn(),
   };
   return render(() => <CorruptionErrorPage {...props} />);
+}
+
+/** Helper: show backup list, select first item, click restore button, then return the modal confirm button */
+async function openConfirmModal(queries: ReturnType<typeof renderCorruptionPage>) {
+  const { getByTestId, findAllByTestId, findByTestId } = queries;
+  fireEvent.click(getByTestId("show-backups-btn"));
+  const items = await findAllByTestId("backup-item");
+  fireEvent.click(items[0]);
+  const restoreBtn = await findByTestId("restore-btn");
+  fireEvent.click(restoreBtn);
+  await waitFor(() => {
+    expect(document.querySelector("[data-testid='confirm-restore-btn']")).not.toBeNull();
+  });
 }
 
 describe("CorruptionErrorPage", () => {
@@ -101,44 +121,25 @@ describe("CorruptionErrorPage", () => {
     expect(noBackups.textContent).toContain("No backups available");
   });
 
-  // 7.13: Selecting a backup and confirming triggers restore
-  it("selecting a backup and confirming triggers restore", async () => {
+  // 7.13: Selecting a backup, confirming and entering password triggers restore
+  it("selecting a backup and confirming with correct password triggers restore", async () => {
     const onRestored = vi.fn();
-    const { getByTestId, findAllByTestId, findByTestId } = renderCorruptionPage({
-      onRestored,
-    });
+    const queries = renderCorruptionPage({ onRestored });
 
-    // Show backup list
-    fireEvent.click(getByTestId("show-backups-btn"));
+    await openConfirmModal(queries);
 
-    // Wait for backups to load
-    const items = await findAllByTestId("backup-item");
-    expect(items.length).toBe(2);
+    // Password input must be present in the confirm modal
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']") as HTMLInputElement;
+    expect(passwordInput).not.toBeNull();
+    fireEvent.input(passwordInput, { target: { value: "correct-password" } });
 
-    // Select first backup
-    fireEvent.click(items[0]);
-
-    // Click restore button
-    const restoreBtn = await findByTestId("restore-btn");
-    fireEvent.click(restoreBtn);
-
-    // Confirm dialog renders in a portal — query document directly
-    await waitFor(() => {
-      const confirmText = document.body.textContent;
-      expect(confirmText).toContain(
-        "This will replace your current vault with the selected backup. Continue?"
-      );
-    });
-
-    // Click confirm button (also in portal)
     const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
-    expect(confirmBtn).not.toBeNull();
     fireEvent.click(confirmBtn);
 
-    // Wait for restore to complete
     await waitFor(() => {
       expect(mockRestoreVaultBackup).toHaveBeenCalledWith(
-        "/mock/backups/vault-2026-02-10T12-30-00Z.verrou"
+        "/mock/backups/vault-2026-02-10T12-30-00Z.verrou",
+        "correct-password"
       );
     });
   });
@@ -146,22 +147,12 @@ describe("CorruptionErrorPage", () => {
   // 7.14: Successful restore shows success toast
   it("shows success toast after successful restore", async () => {
     const onRestored = vi.fn();
-    const { getByTestId, findAllByTestId, findByTestId } = renderCorruptionPage({
-      onRestored,
-    });
+    const queries = renderCorruptionPage({ onRestored });
 
-    // Show backups → select → restore → confirm
-    fireEvent.click(getByTestId("show-backups-btn"));
-    const items = await findAllByTestId("backup-item");
-    fireEvent.click(items[0]);
+    await openConfirmModal(queries);
 
-    const restoreBtn = await findByTestId("restore-btn");
-    fireEvent.click(restoreBtn);
-
-    // Wait for modal to appear in portal
-    await waitFor(() => {
-      expect(document.querySelector("[data-testid='confirm-restore-btn']")).not.toBeNull();
-    });
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']") as HTMLInputElement;
+    fireEvent.input(passwordInput, { target: { value: "correct-password" } });
 
     const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
     fireEvent.click(confirmBtn);
@@ -175,21 +166,14 @@ describe("CorruptionErrorPage", () => {
     });
   });
 
-  it("shows error toast when restore fails", async () => {
+  it("shows error toast when restore fails with a generic error", async () => {
     mockRestoreVaultBackup.mockRejectedValue(new Error("disk error"));
 
-    const { getByTestId, findAllByTestId, findByTestId } = renderCorruptionPage();
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
 
-    fireEvent.click(getByTestId("show-backups-btn"));
-    const items = await findAllByTestId("backup-item");
-    fireEvent.click(items[0]);
-
-    const restoreBtn = await findByTestId("restore-btn");
-    fireEvent.click(restoreBtn);
-
-    await waitFor(() => {
-      expect(document.querySelector("[data-testid='confirm-restore-btn']")).not.toBeNull();
-    });
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']") as HTMLInputElement;
+    fireEvent.input(passwordInput, { target: { value: "some-password" } });
 
     const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
     fireEvent.click(confirmBtn);
@@ -201,6 +185,73 @@ describe("CorruptionErrorPage", () => {
     });
   });
 
+  // Wrong-password error: inline message inside modal
+  it("shows inline invalid-password error when INVALID_PASSWORD is returned", async () => {
+    mockRestoreVaultBackup.mockRejectedValue(
+      JSON.stringify({ code: "INVALID_PASSWORD", message: "Incorrect password. Please try again." })
+    );
+
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
+
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']") as HTMLInputElement;
+    fireEvent.input(passwordInput, { target: { value: "wrong-password" } });
+
+    const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
+    fireEvent.click(confirmBtn);
+
+    // Modal stays open, inline error appears
+    await waitFor(() => {
+      const errorEl = document.querySelector("[data-testid='restore-password-error']");
+      expect(errorEl).not.toBeNull();
+      expect(errorEl!.textContent).toContain("Incorrect password");
+    });
+
+    // Toast error should NOT be shown for invalid password
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  // Rate-limited error: inline message inside modal
+  it("shows inline rate-limited error when RATE_LIMITED is returned", async () => {
+    mockRestoreVaultBackup.mockRejectedValue(
+      JSON.stringify({ code: "RATE_LIMITED", message: "Too many attempts. Please wait." })
+    );
+
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
+
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']") as HTMLInputElement;
+    fireEvent.input(passwordInput, { target: { value: "some-password" } });
+
+    const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      const errorEl = document.querySelector("[data-testid='restore-password-error']");
+      expect(errorEl).not.toBeNull();
+      expect(errorEl!.textContent).toContain("Too many attempts");
+    });
+
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("shows password-required error when confirm clicked with empty password", async () => {
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
+
+    // Do NOT fill in password — click confirm immediately
+    const confirmBtn = document.querySelector("[data-testid='confirm-restore-btn']") as HTMLElement;
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      const errorEl = document.querySelector("[data-testid='restore-password-error']");
+      expect(errorEl).not.toBeNull();
+      expect(errorEl!.textContent).toContain("Password is required");
+    });
+
+    expect(mockRestoreVaultBackup).not.toHaveBeenCalled();
+  });
+
   it("restore button has aria-disabled until a backup is selected", async () => {
     const { getByTestId, findByTestId } = renderCorruptionPage();
 
@@ -208,5 +259,26 @@ describe("CorruptionErrorPage", () => {
 
     const restoreBtn = await findByTestId("restore-btn");
     expect(restoreBtn.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("confirm modal contains password input", async () => {
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
+
+    const passwordInput = document.querySelector("[data-testid='restore-password-input']");
+    expect(passwordInput).not.toBeNull();
+    expect((passwordInput as HTMLInputElement).type).toBe("password");
+  });
+
+  it("confirm modal shows confirmation text", async () => {
+    const queries = renderCorruptionPage();
+    await openConfirmModal(queries);
+
+    await waitFor(() => {
+      const confirmText = document.body.textContent;
+      expect(confirmText).toContain(
+        "This will replace your current vault with the selected backup. Continue?"
+      );
+    });
   });
 });

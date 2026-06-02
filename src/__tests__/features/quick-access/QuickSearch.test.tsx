@@ -199,7 +199,7 @@ describe("QuickSearch", () => {
 
     await waitFor(() => {
       expect(container.textContent).toContain("navigate");
-      expect(container.textContent).toContain("copy");
+      expect(container.textContent).toContain("open");
       expect(container.textContent).toContain("close");
     });
   });
@@ -214,7 +214,7 @@ describe("QuickSearch", () => {
     });
   });
 
-  it("copies username on Enter for credential entry", async () => {
+  it("opens the detail view on Enter for the selected entry", async () => {
     const { container } = render(() => <QuickSearch />);
 
     await waitFor(() => {
@@ -234,12 +234,15 @@ describe("QuickSearch", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     fireEvent.keyDown(wrapper, { key: "Enter" });
 
+    // Enter opens the detail view — the search combobox is replaced by the detail.
     await waitFor(() => {
-      expect(ipc.copyToClipboard).toHaveBeenCalledWith("dev@gitlab.com");
+      expect(container.querySelector("input[role='combobox']")).toBeNull();
     });
+    // Secrets are never copied straight from the list — the row stays metadata-only.
+    expect(ipc.copyToClipboard).not.toHaveBeenCalled();
   });
 
-  it("does not call generateTotpCode for credential Enter", async () => {
+  it("does not call generateTotpCode when opening a credential", async () => {
     const { container } = render(() => <QuickSearch />);
 
     await waitFor(() => {
@@ -261,11 +264,11 @@ describe("QuickSearch", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     fireEvent.keyDown(wrapper, { key: "Enter" });
 
+    // Detail view opens; a credential detail must not generate TOTP codes.
     await waitFor(() => {
-      expect(ipc.copyToClipboard).toHaveBeenCalledWith("dev@gitlab.com");
+      expect(container.querySelector("input[role='combobox']")).toBeNull();
     });
 
-    // No new generateTotpCode calls after Enter
     const callCountAfter = (ipc.generateTotpCode as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(callCountAfter).toBe(callCountBefore);
   });

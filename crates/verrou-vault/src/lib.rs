@@ -3,7 +3,14 @@
 //! Manages encrypted storage via `SQLCipher`, entry CRUD operations,
 //! and vault lifecycle (create, open, lock, backup).
 
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 pub mod db;
 pub mod error;

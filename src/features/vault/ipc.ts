@@ -294,20 +294,29 @@ export async function listVaultBackups(
   ];
 }
 
-/** Restore a vault from a selected backup. */
+/** Restore a vault from a selected backup (re-authenticates with password). */
 export async function restoreVaultBackup(
   backupPath: string,
+  password: string,
   vaultDir?: string,
 ): Promise<void> {
   if (IS_TAURI) {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke("restore_vault_backup", {
+      password,
       vaultDir: vaultDir ?? _vaultDir,
       backupPath,
     });
   }
 
+  // Mock fallback.
   await delay(1000);
+  if (password === "wrong") {
+    throw JSON.stringify({
+      code: "INVALID_PASSWORD",
+      message: "Incorrect password. Please try again.",
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

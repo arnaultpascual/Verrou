@@ -1,0 +1,57 @@
+<svg width="256" height="256" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verrou">
+  <title>Verrou — lattice-vault mark (honeycomb + keyhole, geometric)</title>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7E84E8" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#7E84E8" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Beveled metallic frame: light top-left → dark bottom-right -->
+    <linearGradient id="bevel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B9BEF8"/>
+      <stop offset="52%" stop-color="#7E84E8"/>
+      <stop offset="100%" stop-color="#4A4FA0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App-icon background (drop this rect for a transparent mark) -->
+  <rect width="512" height="512" rx="112" fill="#0F0F14"/>
+
+  <!-- Iris glow -->
+  <circle cx="256" cy="256" r="220" fill="url(#glow)"/>
+
+  <!-- Lattice backplate: octagon -->
+  <polygon points="476,347 347,476 165,476 36,347 36,165 165,36 347,36 476,165"
+           stroke="#7E84E8" stroke-width="2.5" stroke-opacity="0.28" fill="none" stroke-linejoin="round"/>
+  <!-- Circuit / dial halo -->
+  <circle cx="256" cy="256" r="158" stroke="#7E84E8" stroke-width="3" stroke-opacity="0.22"
+          fill="none" stroke-dasharray="4 11"/>
+
+  <!-- Honeycomb — outer beveled frames (7 cells) -->
+  <g fill="#16161F" stroke="url(#bevel)" stroke-width="7" stroke-linejoin="round">
+    <polygon points="330,110 293,174 219,174 182,110 219,46 293,46"/>
+    <polygon points="456,183 419,247 345,247 308,183 345,119 419,119"/>
+    <polygon points="456,329 419,393 345,393 308,329 345,265 419,265"/>
+    <polygon points="330,402 293,466 219,466 182,402 219,338 293,338"/>
+    <polygon points="204,329 167,393 93,393 56,329 93,265 167,265"/>
+    <polygon points="204,183 167,247 93,247 56,183 93,119 167,119"/>
+    <polygon points="330,256 293,320 219,320 182,256 219,192 293,192"/>
+  </g>
+
+  <!-- Inner groove line — the "double-trait" bevel -->
+  <g fill="none" stroke="#4E54A8" stroke-width="2.5" stroke-opacity="0.7" stroke-linejoin="round">
+    <polygon points="318,110 287,164 225,164 194,110 225,56 287,56"/>
+    <polygon points="444,183 413,237 351,237 320,183 351,129 413,129"/>
+    <polygon points="444,329 413,383 351,383 320,329 351,275 413,275"/>
+    <polygon points="318,402 287,456 225,456 194,402 225,348 287,348"/>
+    <polygon points="192,329 161,383 99,383 68,329 99,275 161,275"/>
+    <polygon points="192,183 161,237 99,237 68,183 99,129 161,129"/>
+    <polygon points="318,256 287,310 225,310 194,256 225,202 287,202"/>
+  </g>
+
+  <!-- Keyhole with halo — centered on the hexagon center (256,256) -->
+  <circle cx="256" cy="256" r="44" fill="#7E84E8" opacity="0.22"/>
+  <g fill="#CDCFF9">
+    <circle cx="256" cy="248" r="19"/>
+    <path d="M248 257 L244 284 L268 284 L264 257 Z"/>
+  </g>
+</svg>

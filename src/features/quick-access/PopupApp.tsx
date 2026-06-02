@@ -1,8 +1,8 @@
 import type { Component } from "solid-js";
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { checkVaultStatus, setVaultDir } from "../vault/ipc";
 import { CompactUnlock } from "./CompactUnlock";
 import { QuickSearch } from "./QuickSearch";
 import { ToastProvider } from "../../components/ToastProvider";
@@ -18,8 +18,9 @@ export const PopupApp: Component = () => {
 
   onMount(async () => {
     try {
-      const unlocked = await invoke<boolean>("is_vault_unlocked");
-      setIsUnlocked(unlocked);
+      const status = await checkVaultStatus();
+      setVaultDir(status.vaultDir);
+      setIsUnlocked(status.state === "unlocked");
     } catch {
       setIsUnlocked(false);
     }

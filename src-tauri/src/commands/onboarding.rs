@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::State;
 use zeroize::Zeroize;
 
 use crate::state::{ManagedVaultState, VaultSession};
@@ -98,12 +98,11 @@ pub fn check_vault_status(
     app: tauri::AppHandle,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<VaultStatusDto, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
-    let vault_file = data_dir.join("vault.verrou");
+    let vault_file = crate::paths::vault_header_file(&app)
+        .map_err(|e| format!("Failed to resolve vault header path: {e}"))?;
     let has_vault = vault_file.exists();
 
     let is_unlocked = vault_state
@@ -172,9 +171,7 @@ pub async fn create_vault(
     app: tauri::AppHandle,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<CreateVaultDto, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
     let vault_arc = Arc::clone(vault_state.inner());
@@ -282,9 +279,7 @@ pub async fn generate_recovery_key(
     vault_state: State<'_, ManagedVaultState>,
     app: tauri::AppHandle,
 ) -> Result<RecoveryKeyDto, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
     // Copy master key bytes while holding the lock, then release.

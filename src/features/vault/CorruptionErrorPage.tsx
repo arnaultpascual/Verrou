@@ -4,6 +4,7 @@ import { Button, Icon, Modal, useToast } from "../../components";
 import {
   listVaultBackups,
   restoreVaultBackup,
+  parseUnlockError,
 } from "./ipc";
 import type { BackupInfoDto } from "./ipc";
 import { t } from "../../stores/i18nStore";
@@ -31,6 +32,8 @@ export const CorruptionErrorPage: Component<CorruptionErrorPageProps> = (props) 
   const [selectedBackup, setSelectedBackup] = createSignal<BackupInfoDto | null>(null);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [restoring, setRestoring] = createSignal(false);
+  const [restorePassword, setRestorePassword] = createSignal("");
+  const [restorePasswordError, setRestorePasswordError] = createSignal("");
 
   const [backups] = createResource(showBackups, async (show) => {
     if (!show) return [];
@@ -47,23 +50,50 @@ export const CorruptionErrorPage: Component<CorruptionErrorPageProps> = (props) 
 
   const handleRestoreClick = () => {
     if (!selectedBackup()) return;
+    setRestorePassword("");
+    setRestorePasswordError("");
     setConfirmOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setConfirmOpen(false);
+    setRestorePassword("");
+    setRestorePasswordError("");
   };
 
   const handleConfirmRestore = async () => {
     const backup = selectedBackup();
     if (!backup) return;
 
+    const password = restorePassword();
+    if (!password) {
+      setRestorePasswordError(t("vault.corruption.passwordRequired"));
+      return;
+    }
+
+    setRestorePasswordError("");
     setConfirmOpen(false);
     setRestoring(true);
 
     try {
-      await restoreVaultBackup(backup.path);
+      await restoreVaultBackup(backup.path, password);
       toast.success(t("vault.corruption.restoreSuccess"));
       props.onRestored();
-    } catch {
-      toast.error(t("vault.corruption.restoreError"));
+    } catch (err) {
       setRestoring(false);
+      const errorStr = typeof err === "string" ? err : String(err);
+      const parsed = parseUnlockError(errorStr);
+      if (parsed.code === "INVALID_PASSWORD") {
+        setRestorePassword("");
+        setRestorePasswordError(t("vault.corruption.invalidPassword"));
+        setConfirmOpen(true);
+      } else if (parsed.code === "RATE_LIMITED") {
+        setRestorePassword("");
+        setRestorePasswordError(t("vault.corruption.rateLimited"));
+        setConfirmOpen(true);
+      } else {
+        toast.error(t("vault.corruption.restoreError"));
+      }
     }
   };
 
@@ -144,14 +174,14 @@ export const CorruptionErrorPage: Component<CorruptionErrorPageProps> = (props) 
         </Show>
       </div>
 
-      {/* Confirmation modal */}
+      {/* Confirmation modal with password re-authentication */}
       <Modal
         open={confirmOpen()}
-        onClose={() => setConfirmOpen(false)}
+        onClose={handleModalClose}
         title={t("vault.corruption.confirmTitle")}
         actions={
           <>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <Button variant="ghost" onClick={handleModalClose}>
               {t("vault.corruption.cancel")}
             </Button>
             <Button onClick={handleConfirmRestore} data-testid="confirm-restore-btn">
@@ -161,6 +191,26 @@ export const CorruptionErrorPage: Component<CorruptionErrorPageProps> = (props) 
         }
       >
         <p>{t("vault.corruption.confirmMessage")}</p>
+        <div class={styles.passwordField}>
+          <label for="restore-password-input">{t("vault.corruption.passwordLabel")}</label>
+          <input
+            id="restore-password-input"
+            type="password"
+            value={restorePassword()}
+            onInput={(e) => {
+              setRestorePassword(e.currentTarget.value);
+              setRestorePasswordError("");
+            }}
+            placeholder={t("vault.corruption.passwordPlaceholder")}
+            autocomplete="current-password"
+            data-testid="restore-password-input"
+          />
+          <Show when={restorePasswordError()}>
+            <p class={styles.passwordError} data-testid="restore-password-error" role="alert">
+              {restorePasswordError()}
+            </p>
+          </Show>
+        </div>
       </Modal>
     </div>
   );

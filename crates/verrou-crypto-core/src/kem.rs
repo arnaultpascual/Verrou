@@ -60,6 +60,17 @@ const HKDF_INFO: &[u8] = b"VERROU-HYBRID-KEM-v1";
 /// Combined X25519 + ML-KEM shared secret input length for HKDF (64 bytes).
 const COMBINED_SS_LEN: usize = 64;
 
+/// Internal fixed label for deterministic hybrid KEM keypair derivation.
+///
+/// Combined with the caller-supplied `context` as HKDF `info` for domain
+/// separation. Distinct from the signing label (`VERROU-SIGN-KEYPAIR-v1`)
+/// so KEM and signing derivations can never collide for the same IKM.
+const DERIVE_KEM_LABEL: &[u8] = b"VERROU-KEM-KEYPAIR-v1";
+
+/// Total HKDF output bytes for deterministic KEM keypair derivation:
+/// 64-byte ML-KEM-1024 keygen seed + 32-byte X25519 static secret.
+const DERIVE_KEM_OKM_LEN: usize = ML_KEM_KEYGEN_SEED_LEN + X25519_PRIVATE_KEY_LEN;
+
 // ---------------------------------------------------------------------------
 // HKDF output length marker
 // ---------------------------------------------------------------------------
@@ -70,6 +81,16 @@ struct HkdfLen32;
 impl hkdf::KeyType for HkdfLen32 {
     fn len(&self) -> usize {
         SHARED_SECRET_LEN
+    }
+}
+
+/// Marker type for `ring::hkdf::Prk::expand` — requests the combined keypair
+/// derivation output ([`DERIVE_KEM_OKM_LEN`] = 96 bytes).
+struct HkdfLenKemDerive;
+
+impl hkdf::KeyType for HkdfLenKemDerive {
+    fn len(&self) -> usize {
+        DERIVE_KEM_OKM_LEN
     }
 }
 
@@ -227,6 +248,98 @@ pub fn generate_keypair() -> Result<HybridKeyPair, CryptoError> {
 
     let mut ml_kem_pk_vec = Vec::with_capacity(ML_KEM_PUBLIC_KEY_LEN);
     ml_kem_pk_vec.extend_from_slice(ml_kem_pub_raw);
+
+    Ok(HybridKeyPair {
+        public: HybridPublicKey {
+            x25519: x25519_public.to_bytes(),
+            ml_kem: ml_kem_pk_vec,
+        },
+        private: HybridPrivateKey {
+            x25519: x25519_sk_buf,
+            ml_kem: ml_kem_sk_buf,
+        },
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic key derivation
+// ---------------------------------------------------------------------------
+
+/// Deterministically derive a hybrid X25519 + ML-KEM-1024 key pair from input
+/// key material.
+///
+/// Unlike [`generate_keypair`] (which draws fresh CSPRNG randomness), this
+/// regenerates the **same** key pair every time it is called with the same
+/// `ikm` and `context`. This lets the vault reconstruct its KEM key pair on
+/// every unlock from the master key, with no need to store the private bytes.
+///
+/// # Derivation
+///
+/// `ikm` is fed through HKDF-SHA256 (empty salt) with the `info` formed by
+/// concatenating the internal fixed label [`DERIVE_KEM_LABEL`]
+/// (`b"VERROU-KEM-KEYPAIR-v1"`) and the caller-supplied `context`. The output
+/// is expanded to [`DERIVE_KEM_OKM_LEN`] (96) bytes and split as:
+///
+/// - bytes `0..64` — ML-KEM-1024 keygen seed (FIPS 203 `d || z`)
+/// - bytes `64..96` — X25519 static secret scalar
+///
+/// The internal label provides domain separation from the signing derivation
+/// ([`crate::signing::derive_signing_keypair`]), so the two can never collide.
+/// The `context` provides caller-level domain separation: a different
+/// `context` yields a completely independent key pair.
+///
+/// All derived seed material is zeroized before returning.
+///
+/// # Errors
+///
+/// Returns [`CryptoError::KeyEncapsulation`] if HKDF derivation fails.
+/// Returns [`CryptoError::SecureMemory`] if secure buffer allocation fails.
+pub fn derive_keypair(ikm: &[u8], context: &[u8]) -> Result<HybridKeyPair, CryptoError> {
+    // -- HKDF-SHA256 expand to 96 bytes (64 ML-KEM seed || 32 X25519 secret) --
+    // `info` combines the internal fixed label with the caller's context for
+    // domain separation. The binding must outlive `okm` (which borrows it).
+    let info: [&[u8]; 2] = [DERIVE_KEM_LABEL, context];
+    let salt = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]);
+    let prk = salt.extract(ikm);
+    let okm = prk
+        .expand(&info, HkdfLenKemDerive)
+        .map_err(|_| CryptoError::KeyEncapsulation("HKDF expand failed".into()))?;
+
+    let mut derived = [0u8; DERIVE_KEM_OKM_LEN];
+    okm.fill(&mut derived)
+        .map_err(|_| CryptoError::KeyEncapsulation("HKDF fill failed".into()))?;
+
+    // -- Split derived bytes into the two seeds --
+    let mut ml_kem_seed = [0u8; ML_KEM_KEYGEN_SEED_LEN];
+    ml_kem_seed.copy_from_slice(&derived[..ML_KEM_KEYGEN_SEED_LEN]);
+    let mut x25519_sk_bytes = [0u8; X25519_PRIVATE_KEY_LEN];
+    x25519_sk_bytes.copy_from_slice(&derived[ML_KEM_KEYGEN_SEED_LEN..]);
+    derived.zeroize();
+
+    // -- X25519 from the derived 32-byte scalar --
+    let x25519_secret = x25519_dalek::StaticSecret::from(x25519_sk_bytes);
+    x25519_sk_bytes.zeroize();
+    let x25519_public = x25519_dalek::PublicKey::from(&x25519_secret);
+
+    let mut x25519_sk_out = x25519_secret.to_bytes();
+    let x25519_sk_buf = SecretBuffer::new(&x25519_sk_out).map_err(|e| {
+        x25519_sk_out.zeroize();
+        ml_kem_seed.zeroize();
+        CryptoError::SecureMemory(format!("X25519 private key allocation failed: {e}"))
+    })?;
+    x25519_sk_out.zeroize();
+    // x25519_secret is Zeroize-on-drop via x25519-dalek "zeroize" feature.
+
+    // -- ML-KEM-1024 from the derived 64-byte seed --
+    let ml_kem_kp = libcrux_ml_kem::mlkem1024::generate_key_pair(ml_kem_seed);
+    ml_kem_seed.zeroize();
+
+    let ml_kem_sk_buf = SecretBuffer::new(ml_kem_kp.sk()).map_err(|e| {
+        CryptoError::SecureMemory(format!("ML-KEM private key allocation failed: {e}"))
+    })?;
+
+    let mut ml_kem_pk_vec = Vec::with_capacity(ML_KEM_PUBLIC_KEY_LEN);
+    ml_kem_pk_vec.extend_from_slice(ml_kem_kp.pk());
 
     Ok(HybridKeyPair {
         public: HybridPublicKey {
@@ -457,6 +570,93 @@ mod tests {
             ss_dec.expose(),
             "encapsulate/decapsulate shared secrets must match"
         );
+    }
+
+    // -- Deterministic derivation --
+
+    #[test]
+    fn derive_keypair_produces_correct_lengths() {
+        let kp =
+            derive_keypair(b"test ikm material 0123456789", b"ctx").expect("derive should succeed");
+        assert_eq!(kp.public.x25519.len(), X25519_PUBLIC_KEY_LEN);
+        assert_eq!(kp.public.ml_kem.len(), ML_KEM_PUBLIC_KEY_LEN);
+        assert_eq!(kp.private.x25519.len(), X25519_PRIVATE_KEY_LEN);
+        assert_eq!(kp.private.ml_kem.len(), ML_KEM_PRIVATE_KEY_LEN);
+    }
+
+    #[test]
+    fn derive_keypair_is_deterministic() {
+        // Same ikm + context must yield byte-identical public key material.
+        let ikm = b"vault-master-key-bytes-deadbeef!";
+        let ctx = b"verrou://kem-keypair";
+        let kp1 = derive_keypair(ikm, ctx).expect("derive should succeed");
+        let kp2 = derive_keypair(ikm, ctx).expect("derive should succeed");
+
+        assert_eq!(
+            kp1.public.x25519, kp2.public.x25519,
+            "X25519 public keys must be identical across derivations"
+        );
+        assert_eq!(
+            kp1.public.ml_kem, kp2.public.ml_kem,
+            "ML-KEM public keys must be identical across derivations"
+        );
+        // Private material must also be identical.
+        assert_eq!(kp1.private.x25519.expose(), kp2.private.x25519.expose());
+        assert_eq!(kp1.private.ml_kem.expose(), kp2.private.ml_kem.expose());
+    }
+
+    #[test]
+    fn derive_keypair_different_context_yields_different_keys() {
+        let ikm = b"vault-master-key-bytes-deadbeef!";
+        let kp_a = derive_keypair(ikm, b"context-a").expect("derive should succeed");
+        let kp_b = derive_keypair(ikm, b"context-b").expect("derive should succeed");
+
+        assert_ne!(
+            kp_a.public.x25519, kp_b.public.x25519,
+            "different context must yield different X25519 public key"
+        );
+        assert_ne!(
+            kp_a.public.ml_kem, kp_b.public.ml_kem,
+            "different context must yield different ML-KEM public key"
+        );
+    }
+
+    #[test]
+    fn derive_keypair_different_ikm_yields_different_keys() {
+        let ctx = b"same-context";
+        let kp_a = derive_keypair(b"ikm-alpha-0000000000000000000000", ctx)
+            .expect("derive should succeed");
+        let kp_b = derive_keypair(b"ikm-bravo-0000000000000000000000", ctx)
+            .expect("derive should succeed");
+
+        assert_ne!(kp_a.public.x25519, kp_b.public.x25519);
+        assert_ne!(kp_a.public.ml_kem, kp_b.public.ml_kem);
+    }
+
+    #[test]
+    fn derive_keypair_encapsulate_decapsulate_roundtrip() {
+        // A derived key pair must work for a full encap/decap round-trip.
+        let kp = derive_keypair(b"roundtrip-ikm-material-0123456789", b"rt")
+            .expect("derive should succeed");
+        let (ct, ss_enc) = encapsulate(&kp.public).expect("encapsulate should succeed");
+        let ss_dec = decapsulate(&ct, &kp.private).expect("decapsulate should succeed");
+        assert_eq!(
+            ss_enc.expose(),
+            ss_dec.expose(),
+            "derived key pair encap/decap shared secrets must match"
+        );
+    }
+
+    #[test]
+    fn derive_keypair_empty_context_is_supported_and_distinct() {
+        let ikm = b"some-ikm-material-for-empty-ctx!!";
+        let kp_empty = derive_keypair(ikm, b"").expect("derive with empty ctx should succeed");
+        let kp_nonempty = derive_keypair(ikm, b"x").expect("derive should succeed");
+        // Empty context still derives a valid, deterministic key...
+        let kp_empty2 = derive_keypair(ikm, b"").expect("derive should succeed");
+        assert_eq!(kp_empty.public.x25519, kp_empty2.public.x25519);
+        // ...and differs from a non-empty context.
+        assert_ne!(kp_empty.public.x25519, kp_nonempty.public.x25519);
     }
 
     #[test]

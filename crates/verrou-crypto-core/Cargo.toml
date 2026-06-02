@@ -15,8 +15,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rand = "0.8"
 x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
-libcrux-ml-kem = { version = "0.0.6", default-features = false, features = ["mlkem1024"] }
-libcrux-ml-dsa = { version = "0.0.6", default-features = false, features = ["mldsa65"] }
+libcrux-ml-kem = { version = "0.0.9", default-features = false, features = ["mlkem1024"] }
+libcrux-ml-dsa = { version = "0.0.9", default-features = false, features = ["mldsa65"] }
 thiserror = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

@@ -18,7 +18,7 @@ use std::io::Write;
 
 use data_encoding::BASE64;
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::State;
 use zeroize::Zeroize;
 
 use super::auth_utils::{constant_time_key_eq, err_json};
@@ -275,11 +275,10 @@ fn verify_password_for_transfer(
     }
 
     // Read vault header.
-    let vault_path = app.path().app_data_dir().map_err(|_| {
+    let header_path = crate::paths::vault_header_file(app).map_err(|_| {
         master_key_copy.zeroize();
         err_json("INTERNAL_ERROR", "Failed to resolve vault directory.")
     })?;
-    let header_path = vault_path.join("vault.verrou");
 
     let file_data = std::fs::read(&header_path).map_err(|_| {
         master_key_copy.zeroize();

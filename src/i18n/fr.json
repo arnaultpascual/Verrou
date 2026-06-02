@@ -301,7 +301,12 @@
       "restoreFromBackup": "Restaurer depuis une sauvegarde",
       "restoreSelected": "Restaurer la sauvegarde sélectionnée",
       "restoreSuccess": "Coffre restauré avec succès",
-      "restoring": "Restauration…"
+      "restoring": "Restauration…",
+      "passwordLabel": "Mot de passe principal",
+      "passwordPlaceholder": "Entrez votre mot de passe principal",
+      "passwordRequired": "Le mot de passe est requis pour restaurer.",
+      "invalidPassword": "Mot de passe incorrect. Veuillez réessayer.",
+      "rateLimited": "Trop de tentatives. Veuillez patienter avant de réessayer."
     }
   },
   "entries": {
@@ -1400,7 +1405,25 @@
     "unlocking": "Déverrouillage…",
     "unpinned": "{{name}} désépinglé",
     "usernameCopied": "Nom d'utilisateur de {{name}} copié",
-    "verifying": "Vérification…"
+    "verifying": "Vérification…",
+    "detail": {
+      "back": "Retour",
+      "username": "Nom d'utilisateur",
+      "password": "Mot de passe",
+      "urls": "URLs",
+      "reveal": "Révéler",
+      "hide": "Masquer",
+      "hidingIn": "Masquage dans {{seconds}}s",
+      "passwordCopied": "Mot de passe copié",
+      "usernameCopied": "Nom d'utilisateur copié",
+      "codeCopied": "Code copié",
+      "openMainVault": "Ouvrez le coffre principal pour afficher cette entrée",
+      "copyCode": "Copier le code",
+      "revealError": "Mot de passe incorrect",
+      "hintsBack": "retour",
+      "hintsOpen": "ouvrir",
+      "passwordRequired": "Mot de passe requis"
+    }
   },
   "passwordHealth": {
     "title": "Santé des mots de passe",

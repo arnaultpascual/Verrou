@@ -1,4 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! Integration tests for vault lifecycle — creation, calibration, key hierarchy.
 

@@ -14,6 +14,26 @@ use tauri::State;
 
 use crate::state::ManagedVaultState;
 
+/// Maximum size of an import file we will read into memory.
+///
+/// M1 (denial-of-service) guard: a crafted import file could otherwise force an unbounded
+/// `std::fs::read` allocation before any size check runs. 256 MiB is far above
+/// any realistic vault export (attachments are capped at 10 MiB each).
+const MAX_IMPORT_FILE_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Read an import file into memory with a size cap (M1 denial-of-service guard).
+///
+/// Rejects oversized files via a metadata check *before* allocating, so a
+/// crafted multi-gigabyte file cannot exhaust memory.
+fn read_import_file(path: impl AsRef<std::path::Path>) -> Result<Vec<u8>, String> {
+    let path = path.as_ref();
+    let meta = std::fs::metadata(path).map_err(|e| format!("Failed to read import file: {e}"))?;
+    if meta.len() > MAX_IMPORT_FILE_BYTES {
+        return Err("Import file is too large.".to_string());
+    }
+    std::fs::read(path).map_err(|e| format!("Failed to read import file: {e}"))
+}
+
 // ---------------------------------------------------------------------------
 // DTOs
 // ---------------------------------------------------------------------------
@@ -738,8 +758,7 @@ pub async fn validate_verrou_import(
     request: ValidateVerrouImportRequest,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<VerrouImportPreviewDto, String> {
-    let file_data = std::fs::read(&request.file_path)
-        .map_err(|e| format!("Failed to read import file: {e}"))?;
+    let file_data = read_import_file(&request.file_path)?;
 
     let state = vault_state
         .lock()
@@ -752,6 +771,7 @@ pub async fn validate_verrou_import(
         session.db.connection(),
         &file_data,
         request.password.as_bytes(),
+        Some(&session.master_key),
     )
     .map_err(format_import_error)?;
 
@@ -802,8 +822,7 @@ pub async fn confirm_verrou_import(
 ) -> Result<VerrouImportResultDto, String> {
     let duplicate_mode = parse_duplicate_mode(&request.duplicate_mode)?;
 
-    let file_data = std::fs::read(&request.file_path)
-        .map_err(|e| format!("Failed to read import file: {e}"))?;
+    let file_data = read_import_file(&request.file_path)?;
 
     let mut master_key_copy = [0u8; 32];
     {

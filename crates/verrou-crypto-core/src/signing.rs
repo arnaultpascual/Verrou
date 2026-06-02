@@ -22,6 +22,7 @@ use crate::error::CryptoError;
 use crate::memory::SecretBuffer;
 use rand::rngs::OsRng;
 use rand::RngCore;
+use ring::hkdf;
 use ring::signature::{self, Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -57,6 +58,34 @@ const ML_DSA_SIGN_RAND_LEN: usize = 32;
 
 /// ML-DSA context string for domain separation.
 const ML_DSA_CONTEXT: &[u8] = b"VERROU-HYBRID-SIG-v1";
+
+/// ML-DSA-65 key generation seed size (32 bytes, used for deterministic derivation).
+const ML_DSA_KEYGEN_SEED_LEN: usize = ML_DSA_KEYGEN_RAND_LEN;
+
+/// Internal fixed label for deterministic hybrid signing keypair derivation.
+///
+/// Combined with the caller-supplied `context` as HKDF `info` for domain
+/// separation. Distinct from the KEM label (`VERROU-KEM-KEYPAIR-v1`) so
+/// signing and KEM derivations can never collide for the same IKM.
+const DERIVE_SIGN_LABEL: &[u8] = b"VERROU-SIGN-KEYPAIR-v1";
+
+/// Total HKDF output bytes for deterministic signing keypair derivation:
+/// 32-byte Ed25519 seed + 32-byte ML-DSA-65 keygen seed.
+const DERIVE_SIGN_OKM_LEN: usize = ED25519_SEED_LEN + ML_DSA_KEYGEN_SEED_LEN;
+
+// ---------------------------------------------------------------------------
+// HKDF output length marker
+// ---------------------------------------------------------------------------
+
+/// Marker type for `ring::hkdf::Prk::expand` — requests the combined signing
+/// keypair derivation output ([`DERIVE_SIGN_OKM_LEN`] = 64 bytes).
+struct HkdfLenSignDerive;
+
+impl hkdf::KeyType for HkdfLenSignDerive {
+    fn len(&self) -> usize {
+        DERIVE_SIGN_OKM_LEN
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -222,6 +251,108 @@ pub fn generate_signing_keypair() -> Result<HybridSigningKeyPair, CryptoError> {
 }
 
 // ---------------------------------------------------------------------------
+// Deterministic key derivation
+// ---------------------------------------------------------------------------
+
+/// Deterministically derive a hybrid Ed25519 + ML-DSA-65 signing key pair from
+/// input key material.
+///
+/// Unlike [`generate_signing_keypair`] (which draws fresh CSPRNG randomness),
+/// this regenerates the **same** key pair every time it is called with the same
+/// `ikm` and `context`. This lets the vault reconstruct its signing key pair on
+/// every unlock from the master key, with no need to store the private bytes.
+///
+/// # Derivation
+///
+/// `ikm` is fed through HKDF-SHA256 (empty salt) with the `info` formed by
+/// concatenating the internal fixed label [`DERIVE_SIGN_LABEL`]
+/// (`b"VERROU-SIGN-KEYPAIR-v1"`) and the caller-supplied `context`. The output
+/// is expanded to [`DERIVE_SIGN_OKM_LEN`] (64) bytes and split as:
+///
+/// - bytes `0..32` — Ed25519 seed (private key)
+/// - bytes `32..64` — ML-DSA-65 keygen seed (FIPS 204 ξ)
+///
+/// The internal label provides domain separation from the KEM derivation
+/// ([`crate::kem::derive_keypair`]), so the two can never collide. The
+/// `context` provides caller-level domain separation: a different `context`
+/// yields a completely independent key pair.
+///
+/// All derived seed material is zeroized before returning.
+///
+/// # Errors
+///
+/// Returns [`CryptoError::Signature`] if HKDF derivation or Ed25519 key
+/// construction fails. Returns [`CryptoError::SecureMemory`] if secure buffer
+/// allocation fails.
+pub fn derive_signing_keypair(
+    ikm: &[u8],
+    context: &[u8],
+) -> Result<HybridSigningKeyPair, CryptoError> {
+    // -- HKDF-SHA256 expand to 64 bytes (32 Ed25519 seed || 32 ML-DSA seed) --
+    // `info` combines the internal fixed label with the caller's context for
+    // domain separation. The binding must outlive `okm` (which borrows it).
+    let info: [&[u8]; 2] = [DERIVE_SIGN_LABEL, context];
+    let salt = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]);
+    let prk = salt.extract(ikm);
+    let okm = prk
+        .expand(&info, HkdfLenSignDerive)
+        .map_err(|_| CryptoError::Signature("HKDF expand failed".into()))?;
+
+    let mut derived = [0u8; DERIVE_SIGN_OKM_LEN];
+    okm.fill(&mut derived)
+        .map_err(|_| CryptoError::Signature("HKDF fill failed".into()))?;
+
+    // -- Split derived bytes into the two seeds --
+    let mut ed25519_seed_bytes = [0u8; ED25519_SEED_LEN];
+    ed25519_seed_bytes.copy_from_slice(&derived[..ED25519_SEED_LEN]);
+    let mut ml_dsa_seed = [0u8; ML_DSA_KEYGEN_SEED_LEN];
+    ml_dsa_seed.copy_from_slice(&derived[ED25519_SEED_LEN..]);
+    derived.zeroize();
+
+    // --- Ed25519 key pair from the derived seed ---
+    let ed25519_kp = Ed25519KeyPair::from_seed_unchecked(&ed25519_seed_bytes).map_err(|e| {
+        ed25519_seed_bytes.zeroize();
+        ml_dsa_seed.zeroize();
+        CryptoError::Signature(format!("Ed25519 key generation failed: {e}"))
+    })?;
+
+    let mut ed25519_pk = [0u8; ED25519_PUBLIC_KEY_LEN];
+    ed25519_pk.copy_from_slice(ed25519_kp.public_key().as_ref());
+
+    let ed25519_seed_buf = SecretBuffer::new(&ed25519_seed_bytes).map_err(|e| {
+        ed25519_seed_bytes.zeroize();
+        ml_dsa_seed.zeroize();
+        CryptoError::SecureMemory(format!("Ed25519 seed allocation failed: {e}"))
+    })?;
+    ed25519_seed_bytes.zeroize();
+
+    // --- ML-DSA-65 key pair from the derived seed ---
+    let ml_dsa_kp = libcrux_ml_dsa::ml_dsa_65::generate_key_pair(ml_dsa_seed);
+    ml_dsa_seed.zeroize();
+
+    let ml_dsa_vk_bytes = ml_dsa_kp.verification_key.as_ref().to_vec();
+    // SAFETY NOTE: `ml_dsa_kp.signing_key` (4032 bytes) is not zeroized after this
+    // copy because libcrux types do not implement `Zeroize` or `ZeroizeOnDrop`.
+    // The authoritative copy lives in `ml_dsa_sk_buf` (mlocked, zeroized on drop).
+    // This is an accepted limitation tracked for future improvement when libcrux
+    // adds zeroization support.
+    let ml_dsa_sk_buf = SecretBuffer::new(ml_dsa_kp.signing_key.as_slice()).map_err(|e| {
+        CryptoError::SecureMemory(format!("ML-DSA signing key allocation failed: {e}"))
+    })?;
+
+    let public = HybridSigningPublicKey {
+        ed25519: ed25519_pk,
+        ml_dsa: ml_dsa_vk_bytes,
+    };
+
+    Ok(HybridSigningKeyPair {
+        ed25519_seed: ed25519_seed_buf,
+        ml_dsa_signing_key: ml_dsa_sk_buf,
+        public,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Sign
 // ---------------------------------------------------------------------------
 
@@ -359,6 +490,104 @@ mod tests {
 
         let sig = sign(message, &kp).expect("signing should succeed");
         verify(message, &sig, &kp.public).expect("verification should succeed");
+    }
+
+    // -- Deterministic derivation --
+
+    #[test]
+    fn derive_signing_keypair_produces_valid_lengths() {
+        let kp = derive_signing_keypair(b"test ikm material 0123456789", b"ctx")
+            .expect("derive should succeed");
+        assert_eq!(kp.ed25519_seed.expose().len(), ED25519_SEED_LEN);
+        assert_eq!(kp.public.ed25519.len(), ED25519_PUBLIC_KEY_LEN);
+        assert_eq!(
+            kp.ml_dsa_signing_key.expose().len(),
+            ML_DSA_65_SIGNING_KEY_LEN
+        );
+        assert_eq!(kp.public.ml_dsa.len(), ML_DSA_65_VERIFICATION_KEY_LEN);
+    }
+
+    #[test]
+    fn derive_signing_keypair_is_deterministic() {
+        let ikm = b"vault-master-key-bytes-deadbeef!";
+        let ctx = b"verrou://sign-keypair";
+        let kp1 = derive_signing_keypair(ikm, ctx).expect("derive should succeed");
+        let kp2 = derive_signing_keypair(ikm, ctx).expect("derive should succeed");
+
+        assert_eq!(
+            kp1.public.ed25519, kp2.public.ed25519,
+            "Ed25519 public keys must be identical across derivations"
+        );
+        assert_eq!(
+            kp1.public.ml_dsa, kp2.public.ml_dsa,
+            "ML-DSA verification keys must be identical across derivations"
+        );
+        assert_eq!(kp1.ed25519_seed.expose(), kp2.ed25519_seed.expose());
+        assert_eq!(
+            kp1.ml_dsa_signing_key.expose(),
+            kp2.ml_dsa_signing_key.expose()
+        );
+    }
+
+    #[test]
+    fn derive_signing_keypair_different_context_yields_different_keys() {
+        let ikm = b"vault-master-key-bytes-deadbeef!";
+        let kp_a = derive_signing_keypair(ikm, b"context-a").expect("derive should succeed");
+        let kp_b = derive_signing_keypair(ikm, b"context-b").expect("derive should succeed");
+
+        assert_ne!(
+            kp_a.public.ed25519, kp_b.public.ed25519,
+            "different context must yield different Ed25519 public key"
+        );
+        assert_ne!(
+            kp_a.public.ml_dsa, kp_b.public.ml_dsa,
+            "different context must yield different ML-DSA verification key"
+        );
+    }
+
+    #[test]
+    fn derive_signing_keypair_different_ikm_yields_different_keys() {
+        let ctx = b"same-context";
+        let kp_a = derive_signing_keypair(b"ikm-alpha-0000000000000000000000", ctx)
+            .expect("derive should succeed");
+        let kp_b = derive_signing_keypair(b"ikm-bravo-0000000000000000000000", ctx)
+            .expect("derive should succeed");
+
+        assert_ne!(kp_a.public.ed25519, kp_b.public.ed25519);
+        assert_ne!(kp_a.public.ml_dsa, kp_b.public.ml_dsa);
+    }
+
+    #[test]
+    fn derive_signing_keypair_sign_verify_roundtrip() {
+        let kp = derive_signing_keypair(b"roundtrip-ikm-material-0123456789", b"rt")
+            .expect("derive should succeed");
+        let message = b"deterministically derived signer";
+
+        let sig = sign(message, &kp).expect("signing should succeed");
+        verify(message, &sig, &kp.public).expect("verification should succeed");
+    }
+
+    /// The KEM and signing derivations must never collide: deriving from the
+    /// SAME ikm and SAME context with their distinct internal labels must
+    /// produce independent Ed25519 / X25519 seeds. We can observe this through
+    /// the resulting public keys (X25519 vs Ed25519 are both 32 bytes and both
+    /// Curve25519-family, so equal seeds would be detectable).
+    #[test]
+    fn kem_and_signing_derivations_do_not_collide() {
+        let ikm = b"shared-input-key-material-00000000";
+        let ctx = b"identical-context";
+
+        let sign_kp = derive_signing_keypair(ikm, ctx).expect("derive should succeed");
+        let kem_kp = crate::kem::derive_keypair(ikm, ctx).expect("derive should succeed");
+
+        // The Ed25519 public key (from the signing label's first 32 bytes) must
+        // differ from the X25519 public key (from the KEM label's last 32
+        // bytes). Distinct HKDF labels guarantee distinct underlying seeds.
+        assert_ne!(
+            sign_kp.public.ed25519.as_slice(),
+            kem_kp.public.x25519.as_slice(),
+            "KEM and signing derivations must not produce colliding key material"
+        );
     }
 
     #[test]

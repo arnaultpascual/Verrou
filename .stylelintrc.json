@@ -40,11 +40,12 @@
     "media-feature-range-notation": null,
     "number-max-precision": null,
     "selector-not-notation": null,
-    "declaration-block-no-redundant-longhand-properties": null
+    "declaration-block-no-redundant-longhand-properties": null,
+    "property-no-unknown": [true, { "ignoreProperties": ["composes"] }]
   },
   "overrides": [
     {
-      "files": ["src/styles/reset.css", "src/styles/variables.css"],
+      "files": ["src/styles/reset.css", "src/styles/variables.css", "src/features/export/PaperBackupDocument.module.css"],
       "rules": {
         "declaration-property-value-disallowed-list": null
       }

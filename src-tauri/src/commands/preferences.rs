@@ -5,7 +5,7 @@
 #![allow(clippy::significant_drop_tightening)]
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::State;
 
 use crate::state::{ManagedAutoLockState, ManagedPreferencesState};
 
@@ -123,9 +123,7 @@ pub fn set_preferences(
     let new_timeout = prefs.auto_lock_timeout_minutes;
     let new_prefs: verrou_vault::preferences::Preferences = prefs.into();
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
     new_prefs
@@ -282,9 +280,7 @@ pub fn update_hotkey_binding(
         _ => unreachable!(),
     }
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
     prefs
@@ -375,9 +371,7 @@ pub fn reset_hotkey_binding(
         _ => unreachable!(),
     }
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
+    let data_dir = crate::paths::app_data_dir(&app)
         .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
 
     prefs

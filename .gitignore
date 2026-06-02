@@ -35,6 +35,19 @@ _bmad-output/
 # Tauri generated
 src-tauri/gen/
 
+# Generated mobile icons (Verrou is desktop-only)
+src-tauri/icons/android/
+src-tauri/icons/ios/
+
+# Fuzzing corpus & crash artifacts (generated, not source)
+fuzz/corpus/
+fuzz/artifacts/
+
 # Test artifacts
 coverage/
 *.profraw
+
+# Internal working docs (not part of the public release)
+CLAUDE.md
+LAUNCH_PLAN.md
+DESIGN_DIRECTION.md

@@ -1,6 +1,8 @@
 mod aes_gcm;
 mod argon2id;
+mod biometric;
 mod bip39;
+mod derive_keypair;
 mod ed25519;
 mod hkdf_kem;
 mod ml_dsa;

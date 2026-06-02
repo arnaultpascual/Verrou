@@ -14,7 +14,9 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use verrou_crypto_core::kdf;
 use verrou_crypto_core::kdf::{Argon2idParams, CalibratedPresets, KdfPreset};
+use verrou_crypto_core::kem::{self, HybridKeyPair};
 use verrou_crypto_core::memory::SecretBytes;
+use verrou_crypto_core::signing::{self, HybridSigningKeyPair};
 use verrou_crypto_core::slots::{self, KeySlot, SlotType};
 use verrou_crypto_core::vault_format::{self, VaultHeader, FORMAT_VERSION};
 use verrou_crypto_core::CryptoError;
@@ -154,6 +156,10 @@ pub struct UnlockVaultResult {
 /// The master key must be held in memory for the session duration
 /// and zeroized on vault lock.
 ///
+/// The `kem_keypair` and `signing_keypair` are deterministically derived from
+/// the master key on every unlock (no storage, no migration needed). They are
+/// used by later phases (PQ-B) for export KEM-wrapping and ML-DSA signing.
+///
 /// Debug implementation is masked to prevent secret leakage.
 pub struct UnlockVaultSession {
     /// Handle to the decrypted `SQLCipher` database.
@@ -162,6 +168,32 @@ pub struct UnlockVaultSession {
     pub master_key: SecretBytes<32>,
     /// Total successful unlock count (for recovery key reminder).
     pub unlock_count: u32,
+    /// Long-term hybrid KEM keypair (X25519 + ML-KEM-1024) derived from the master key.
+    /// Deterministic: same master key → byte-identical keypair every unlock.
+    kem_keypair: HybridKeyPair,
+    /// Long-term hybrid signing keypair (Ed25519 + ML-DSA-65) derived from the master key.
+    /// Deterministic: same master key → byte-identical keypair every unlock.
+    signing_keypair: HybridSigningKeyPair,
+}
+
+impl UnlockVaultSession {
+    /// Return a reference to the session's hybrid KEM keypair.
+    ///
+    /// The keypair is deterministically derived from the master key and can be
+    /// used for encapsulation/decapsulation in export KEM-wrapping (PQ-B).
+    /// Private key bytes are NOT exposed — use [`verrou_crypto_core::kem`] ops.
+    pub const fn kem_keypair(&self) -> &HybridKeyPair {
+        &self.kem_keypair
+    }
+
+    /// Return a reference to the session's hybrid signing keypair.
+    ///
+    /// The keypair is deterministically derived from the master key and can be
+    /// used for signing in ML-DSA-backed export authentication (PQ-B).
+    /// Private key bytes are NOT exposed — use [`verrou_crypto_core::signing`] ops.
+    pub const fn signing_keypair(&self) -> &HybridSigningKeyPair {
+        &self.signing_keypair
+    }
 }
 
 impl std::fmt::Debug for UnlockVaultSession {
@@ -224,6 +256,31 @@ const BACKOFF_SCHEDULE: &[(u32, u64)] = &[
     (5, 5_000),    //  5+ attempts → 5 seconds
     (3, 1_000),    //  3+ attempts → 1 second
 ];
+
+// ---------------------------------------------------------------------------
+// Session keypair derivation
+// ---------------------------------------------------------------------------
+
+/// Derive the vault's long-term hybrid KEM and signing keypairs from the master key.
+///
+/// Both derivations are deterministic: the same master key and fixed context
+/// strings always produce byte-identical keypairs, so no storage is required.
+///
+/// - KEM context:     `b"verrou-vault-kem-v1"`
+/// - Signing context: `b"verrou-vault-sign-v1"`
+///
+/// # Errors
+///
+/// Returns [`VaultError::Crypto`] if either derivation fails (e.g. allocation
+/// error in `SecretBuffer` mlock).
+fn derive_session_keypairs(
+    master_key: &SecretBytes<32>,
+) -> Result<(HybridKeyPair, HybridSigningKeyPair), VaultError> {
+    let ikm = master_key.expose();
+    let kem_kp = kem::derive_keypair(ikm, b"verrou-vault-kem-v1")?;
+    let sign_kp = signing::derive_signing_keypair(ikm, b"verrou-vault-sign-v1")?;
+    Ok((kem_kp, sign_kp))
+}
 
 // ---------------------------------------------------------------------------
 // Calibration wrapper
@@ -459,10 +516,15 @@ pub fn unlock_vault(req: &UnlockVaultRequest<'_>) -> Result<UnlockVaultSession, 
     header.total_unlock_count = header.total_unlock_count.saturating_add(1);
     persist_header(&header_path, &file_data, &header)?;
 
+    // Step 8: Derive long-term session keypairs from the master key.
+    let (kem_keypair, signing_keypair) = derive_session_keypairs(&master_key)?;
+
     Ok(UnlockVaultSession {
         db,
         master_key,
         unlock_count: header.total_unlock_count,
+        kem_keypair,
+        signing_keypair,
     })
 }
 
@@ -664,10 +726,15 @@ pub fn unlock_vault_with_recovery_key(
     header.total_unlock_count = header.total_unlock_count.saturating_add(1);
     persist_header(&header_path, &file_data, &header)?;
 
+    // Step 9: Derive long-term session keypairs from the master key.
+    let (kem_keypair, signing_keypair) = derive_session_keypairs(&master_key)?;
+
     Ok(UnlockVaultSession {
         db,
         master_key,
         unlock_count: header.total_unlock_count,
+        kem_keypair,
+        signing_keypair,
     })
 }
 
@@ -763,10 +830,15 @@ pub fn unlock_vault_with_biometric(
     header.total_unlock_count = header.total_unlock_count.saturating_add(1);
     persist_header(&header_path, &file_data, &header)?;
 
+    // Step 7: Derive long-term session keypairs from the master key.
+    let (kem_keypair, signing_keypair) = derive_session_keypairs(&master_key)?;
+
     Ok(UnlockVaultSession {
         db,
         master_key,
         unlock_count: header.total_unlock_count,
+        kem_keypair,
+        signing_keypair,
     })
 }
 
@@ -2116,5 +2188,159 @@ mod tests {
     fn unlock_vault_result_has_no_key_material() {
         fn assert_serializable<T: Serialize + Clone>() {}
         assert_serializable::<UnlockVaultResult>();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helper: build calibrated presets with fast (low-cost) params for tests.
+    // ---------------------------------------------------------------------------
+    fn test_calibrated() -> CalibratedPresets {
+        CalibratedPresets {
+            fast: Argon2idParams {
+                m_cost: 8,
+                t_cost: 1,
+                p_cost: 1,
+            },
+            balanced: Argon2idParams {
+                m_cost: 8,
+                t_cost: 1,
+                p_cost: 1,
+            },
+            maximum: Argon2idParams {
+                m_cost: 8,
+                t_cost: 1,
+                p_cost: 1,
+            },
+        }
+    }
+
+    /// Create a temporary vault and return the directory path.
+    fn create_test_vault(dir: &std::path::Path, password: &[u8]) -> CreateVaultResult {
+        let calibrated = test_calibrated();
+        let req = CreateVaultRequest {
+            password,
+            preset: KdfPreset::Fast,
+            vault_dir: dir,
+            calibrated: &calibrated,
+        };
+        create_vault(&req).expect("create_vault should succeed")
+    }
+
+    // -- PQ-A session keypair tests --
+
+    /// Unlocking the same vault twice must yield byte-identical public keys
+    /// (determinism guarantee).
+    #[test]
+    fn session_kem_keypair_is_deterministic_across_unlocks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let password = b"test-password-determinism";
+        create_test_vault(dir.path(), password);
+
+        let req = UnlockVaultRequest {
+            password,
+            vault_dir: dir.path(),
+        };
+
+        let session1 = unlock_vault(&req).expect("first unlock");
+        let pk1_x25519 = session1.kem_keypair().public.x25519;
+        let pk1_ml_kem = session1.kem_keypair().public.ml_kem.clone();
+        drop(session1);
+
+        let session2 = unlock_vault(&req).expect("second unlock");
+        let pk2_x25519 = session2.kem_keypair().public.x25519;
+        let pk2_ml_kem = session2.kem_keypair().public.ml_kem.clone();
+        drop(session2);
+
+        assert_eq!(
+            pk1_x25519, pk2_x25519,
+            "X25519 KEM public key must be identical across unlocks"
+        );
+        assert_eq!(
+            pk1_ml_kem, pk2_ml_kem,
+            "ML-KEM public key must be identical across unlocks"
+        );
+    }
+
+    /// Unlocking the same vault twice must yield byte-identical signing public keys.
+    #[test]
+    fn session_signing_keypair_is_deterministic_across_unlocks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let password = b"test-password-sign-determinism";
+        create_test_vault(dir.path(), password);
+
+        let req = UnlockVaultRequest {
+            password,
+            vault_dir: dir.path(),
+        };
+
+        let session1 = unlock_vault(&req).expect("first unlock");
+        let spk1_ed = session1.signing_keypair().public.ed25519;
+        let spk1_ml = session1.signing_keypair().public.ml_dsa.clone();
+        drop(session1);
+
+        let session2 = unlock_vault(&req).expect("second unlock");
+        let spk2_ed = session2.signing_keypair().public.ed25519;
+        let spk2_ml = session2.signing_keypair().public.ml_dsa.clone();
+        drop(session2);
+
+        assert_eq!(
+            spk1_ed, spk2_ed,
+            "Ed25519 signing public key must be identical across unlocks"
+        );
+        assert_eq!(
+            spk1_ml, spk2_ml,
+            "ML-DSA signing public key must be identical across unlocks"
+        );
+    }
+
+    /// Session KEM keypair must complete an encap/decap round-trip.
+    #[test]
+    fn session_kem_keypair_encap_decap_roundtrip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let password = b"test-password-kem-roundtrip";
+        create_test_vault(dir.path(), password);
+
+        let req = UnlockVaultRequest {
+            password,
+            vault_dir: dir.path(),
+        };
+        let session = unlock_vault(&req).expect("unlock");
+
+        // Encapsulate against the session's public KEM key.
+        let (ciphertext, ss_enc) =
+            verrou_crypto_core::kem::encapsulate(&session.kem_keypair().public)
+                .expect("encapsulate should succeed");
+
+        // Decapsulate using the session's private KEM key.
+        let ss_dec =
+            verrou_crypto_core::kem::decapsulate(&ciphertext, &session.kem_keypair().private)
+                .expect("decapsulate should succeed");
+
+        assert_eq!(
+            ss_enc.expose(),
+            ss_dec.expose(),
+            "KEM encap/decap shared secrets must match"
+        );
+    }
+
+    /// Session signing keypair must complete a sign/verify round-trip.
+    #[test]
+    fn session_signing_keypair_sign_verify_roundtrip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let password = b"test-password-sign-roundtrip";
+        create_test_vault(dir.path(), password);
+
+        let req = UnlockVaultRequest {
+            password,
+            vault_dir: dir.path(),
+        };
+        let session = unlock_vault(&req).expect("unlock");
+
+        let message = b"verrou-pq-a-signing-roundtrip-test";
+
+        let signature = verrou_crypto_core::signing::sign(message, session.signing_keypair())
+            .expect("sign should succeed");
+
+        verrou_crypto_core::signing::verify(message, &signature, &session.signing_keypair().public)
+            .expect("signature must verify against the session signing public key");
     }
 }

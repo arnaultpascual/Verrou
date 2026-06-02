@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a problem with Verrou (NOT for security vulnerabilities)
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug.
+
+        **Do not report security vulnerabilities here.** Use private reporting —
+        see [SECURITY.md](https://github.com/arnaultpascual/Verrou/security/policy).
+
+        ⚠️ **Never paste secrets** (master passwords, seed phrases, recovery
+        codes, TOTP secrets, vault files, or `.verrou` exports) into this issue.
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I have not included any secrets, vault files, or exports.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Verrou version / commit
+      placeholder: "e.g. 0.1.0 or a git SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen, and what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Redact anything sensitive before pasting.
+      render: shell

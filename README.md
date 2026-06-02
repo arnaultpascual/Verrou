@@ -2,11 +2,11 @@
 
 **Sovereign, offline-first, post-quantum encrypted digital vault.**
 
-Verrou is a desktop application that securely stores your most sensitive digital secrets — 2FA codes (TOTP/HOTP), seed phrases (BIP39), recovery codes, credentials, and secure notes — using hybrid post-quantum encryption. It never connects to the internet. All data stays on your device.
+Verrou is a desktop application that securely stores your most sensitive digital secrets — 2FA codes (TOTP/HOTP), seed phrases (BIP39), recovery codes, credentials, and secure notes. It never connects to the internet; all data stays on your device, protected by a quantum-resistant, defense-in-depth design (see Security Model below).
 
 ## Key Features
 
-- **Post-quantum encryption** — Hybrid X25519 + ML-KEM-1024 key encapsulation, AES-256-GCM symmetric encryption, Argon2id key derivation, BLAKE3 hashing
+- **Quantum-resistant by design** — Symmetric encryption at rest (AES-256-GCM + Argon2id + BLAKE3) is inherently quantum-safe; encrypted exports/backups additionally use hybrid **X25519 + ML-KEM-1024** key-wrapping and **Ed25519 + ML-DSA-65** signatures
 - **Fully offline** — Zero network dependencies. No HTTP, DNS, or socket libraries in the entire dependency tree
 - **TOTP/HOTP generation** — Built-in authenticator with clipboard concealment and auto-clear
 - **BIP39 seed phrases** — Full support for 12/15/18/21/24-word mnemonics with optional passphrase (25th word), 10 languages
@@ -17,7 +17,7 @@ Verrou is a desktop application that securely stores your most sensitive digital
 - **QR transfer** — Desktop-to-desktop vault transfer via animated QR codes (no network)
 - **Paper backup** — Printable encrypted PDF backup
 - **Biometric unlock** — Touch ID / Windows Hello / fingerprint (with graceful degradation)
-- **Hardware security** — Secure Enclave (macOS) and TPM 2.0 (Windows) key storage
+- **Hardware-gated biometric** — the biometric secret is held in the OS keychain with biometric access control; non-exportable Secure Enclave / TPM binding is on the roadmap
 - **Password generator** — Cryptographic random passwords and diceware passphrases (EFF wordlist)
 - **Password health** — Reuse detection, weakness scoring, age tracking, missing 2FA alerts
 - **System tray** — Quick-access popup for TOTP codes without opening the main window
@@ -42,7 +42,7 @@ The frontend uses [SolidJS](https://www.solidjs.com/) with [Kobalte](https://kob
 ## Security Model
 
 - **3-layer encryption** — Session key (Argon2id) wraps master key, master key wraps entry keys, entry keys encrypt data
-- **Hybrid KEM** — Both X25519 (classical) and ML-KEM-1024 (post-quantum) must contribute to derive the shared secret
+- **Hybrid post-quantum exports** — encrypted `.verrou` backups are key-wrapped with a hybrid X25519 + ML-KEM-1024 KEM and signed with hybrid Ed25519 + ML-DSA-65; import verifies the signature fail-closed before decrypting. Data at rest is symmetric (already quantum-resistant), so no public key guards it
 - **Zero-network enforcement** — CI verifies no network-capable crate exists in `verrou-crypto-core` or `verrou-vault` dependency trees
 - **Memory protection** — `mlock` pinning, `Zeroize` on drop for all key material
 - **Clipboard concealment** — macOS `NSPasteboard` concealed type, Windows clipboard history exclusion, configurable auto-clear
@@ -50,6 +50,8 @@ The frontend uses [SolidJS](https://www.solidjs.com/) with [Kobalte](https://kob
 - **Binary hardening** — Release builds use LTO, single codegen unit, overflow checks, symbol stripping
 - **SQLCipher** — Database encrypted at rest with raw key injection (no double KDF)
 - **Vault integrity** — BLAKE3 checksums verified on every unlock
+
+Full cryptographic design and threat model: [`docs/CRYPTO_DESIGN.md`](docs/CRYPTO_DESIGN.md) · [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
 ## Build from Source
 
@@ -118,7 +120,7 @@ Verrou/
 │   │   │   ├── totp.rs         # TOTP/HOTP generation (RFC 6238/4226)
 │   │   │   ├── bip39/          # BIP39 mnemonic (10 languages)
 │   │   │   ├── password/       # Password/passphrase generation
-│   │   │   ├── signing.rs      # Ed25519 vault signing
+│   │   │   ├── signing.rs      # Ed25519 + ML-DSA-65 hybrid signing
 │   │   │   ├── transfer/       # QR transfer encryption
 │   │   │   ├── biometric.rs    # Biometric token types
 │   │   │   ├── hardware_key.rs # Hardware security key types

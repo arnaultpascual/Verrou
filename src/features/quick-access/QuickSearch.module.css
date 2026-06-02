@@ -58,18 +58,6 @@
   font-size: var(--font-size-sm);
 }
 
-.copyToast {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  background: var(--color-success);
-  color: var(--color-text-inverse);
-  border-radius: var(--border-radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-}
-
 .hints {
   display: flex;
   gap: var(--spacing-md);

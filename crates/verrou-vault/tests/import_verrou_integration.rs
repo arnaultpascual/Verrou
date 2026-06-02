@@ -1,4 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! Integration tests for `.verrou` vault import (restore).
 //!
@@ -11,6 +15,7 @@ use verrou_crypto_core::kdf::{Argon2idParams, CalibratedPresets, KdfPreset};
 use verrou_crypto_core::memory::SecretBytes;
 use verrou_crypto_core::vault_format;
 use verrou_vault::error::VaultError;
+use verrou_vault::export::envelope;
 use verrou_vault::export::verrou_format::{export_vault, ExportVaultRequest};
 use verrou_vault::import::verrou_format::{
     import_verrou_file, validate_verrou_import, DuplicateMode,
@@ -140,8 +145,13 @@ fn import_empty_vault_succeeds() {
     let (target_db, target_key) = setup_vault(target_dir.path());
 
     // Validate.
-    let preview = validate_verrou_import(target_db.connection(), &export_data, EXPORT_PASSWORD)
-        .expect("validation should succeed");
+    let preview = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    )
+    .expect("validation should succeed");
 
     assert_eq!(preview.total_entries, 0);
     assert_eq!(preview.total_folders, 0);
@@ -202,8 +212,13 @@ fn import_entries_from_export_file() {
     let (target_db, target_key) = setup_vault(target_dir.path());
 
     // Validate.
-    let preview = validate_verrou_import(target_db.connection(), &export_data, EXPORT_PASSWORD)
-        .expect("validation should succeed");
+    let preview = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    )
+    .expect("validation should succeed");
 
     assert_eq!(preview.total_entries, 3);
     assert_eq!(preview.duplicate_count, 0);
@@ -253,7 +268,15 @@ fn import_fails_with_wrong_password() {
     let target_dir = tempfile::tempdir().unwrap();
     let (target_db, _target_key) = setup_vault(target_dir.path());
 
-    let result = validate_verrou_import(target_db.connection(), &export_data, b"wrong-password");
+    // Pass None so the envelope's password fallback is exercised directly
+    // (a wrong importing-vault key would otherwise also fall back, but None
+    // makes the intent explicit: this asserts the password path rejects).
+    let result = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        b"wrong-password",
+        None,
+    );
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
@@ -274,38 +297,55 @@ fn import_rejects_newer_format_version() {
     let export_data =
         export_vault_bytes(&source_db, &source_key, source_dir.path(), EXPORT_PASSWORD);
 
-    // Tamper with the header to set a higher version.
-    // The header is JSON after the first 8 bytes (4 magic + 4 length).
-    let header = vault_format::parse_header_only(&export_data).unwrap();
+    // `export_data` is now a PQ envelope wrapping the raw `vault_format` blob.
+    // To exercise the inner version check, we extract the inner blob, bump its
+    // header version to 99, then re-assemble a *validly signed* envelope around
+    // the tampered inner blob (reusing the original KEM fields). The signature
+    // must pass so the version check — not the signature check — is what fires.
+    let parsed = envelope::parse_envelope(&export_data).expect("envelope should parse");
+
+    let inner = parsed.inner_blob;
+    let header = vault_format::parse_header_only(inner).unwrap();
     assert_eq!(header.version, 1);
 
-    // Find "version":1 in the header JSON and change to "version":99.
+    // Find "version":1 in the inner header JSON and change to "version":99.
     let header_start = 8; // 4 magic + 4 u32 LE header length
-    let header_len = u32::from_le_bytes([
-        export_data[4],
-        export_data[5],
-        export_data[6],
-        export_data[7],
-    ]) as usize;
-    let header_bytes = &export_data[header_start..header_start + header_len];
+    let header_len = u32::from_le_bytes([inner[4], inner[5], inner[6], inner[7]]) as usize;
+    let header_bytes = &inner[header_start..header_start + header_len];
     let header_json = String::from_utf8_lossy(header_bytes);
     let new_json = header_json.replace("\"version\":1", "\"version\":99");
     let new_bytes = new_json.as_bytes();
 
-    // Replace header bytes in-place (same length since "1" → "99" changes length).
-    // Since the length changes, we need to reconstruct the file.
-    let mut new_export = Vec::new();
-    new_export.extend_from_slice(&export_data[..4]); // magic
+    // Reconstruct the tampered inner blob (length changes "1" → "99").
+    let mut new_inner = Vec::new();
+    new_inner.extend_from_slice(&inner[..4]); // magic
     #[allow(clippy::cast_possible_truncation)]
     let header_len_bytes = (new_bytes.len() as u32).to_le_bytes();
-    new_export.extend_from_slice(&header_len_bytes); // new header length
-    new_export.extend_from_slice(new_bytes); // new header JSON
-    new_export.extend_from_slice(&export_data[header_start + header_len..]); // rest of file
+    new_inner.extend_from_slice(&header_len_bytes);
+    new_inner.extend_from_slice(new_bytes);
+    new_inner.extend_from_slice(&inner[header_start + header_len..]);
+
+    // Re-wrap into a validly signed envelope around the tampered inner blob.
+    let sign_kp = verrou_crypto_core::signing::derive_signing_keypair(
+        source_key.expose(),
+        envelope::VAULT_SIGN_CONTEXT,
+    )
+    .unwrap();
+    let parts = envelope::EnvelopeParts {
+        kem_ciphertext: &parsed.kem_ciphertext,
+        wrapped_cek: &parsed.wrapped_cek,
+        signing_public: &sign_kp.public,
+        inner_blob: &new_inner,
+    };
+    let signed = envelope::assemble_signed_portion(&parts).unwrap();
+    let sig = verrou_crypto_core::signing::sign(&signed, &sign_kp).unwrap();
+    let new_export = envelope::finish_envelope(signed, &sig).unwrap();
 
     let target_dir = tempfile::tempdir().unwrap();
     let (target_db, _target_key) = setup_vault(target_dir.path());
 
-    let result = validate_verrou_import(target_db.connection(), &new_export, EXPORT_PASSWORD);
+    // None → password fallback path; the inner version check rejects it.
+    let result = validate_verrou_import(target_db.connection(), &new_export, EXPORT_PASSWORD, None);
     assert!(result.is_err());
     let err = result.unwrap_err();
     // The version check fires in vault_format::parse_header_only() at the crypto
@@ -365,8 +405,13 @@ fn import_skip_mode_skips_duplicates() {
     .unwrap();
 
     // Validate — should detect 1 duplicate.
-    let preview = validate_verrou_import(target_db.connection(), &export_data, EXPORT_PASSWORD)
-        .expect("validation should succeed");
+    let preview = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    )
+    .expect("validation should succeed");
     assert_eq!(preview.total_entries, 2);
     assert_eq!(preview.duplicate_count, 1);
     assert_eq!(preview.duplicates[0].name, "GitHub");
@@ -706,8 +751,13 @@ fn import_preserves_attachments() {
     let target_dir = tempfile::tempdir().unwrap();
     let (target_db, target_key) = setup_vault(target_dir.path());
 
-    let preview = validate_verrou_import(target_db.connection(), &export_data, EXPORT_PASSWORD)
-        .expect("validation should succeed");
+    let preview = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    )
+    .expect("validation should succeed");
     assert_eq!(preview.total_entries, 1);
     assert_eq!(preview.total_attachments, 1);
 
@@ -736,4 +786,245 @@ fn import_preserves_attachments() {
     #[allow(clippy::cast_possible_wrap)]
     let expected_size = file_data.len() as i64;
     assert_eq!(target_attachments[0].size_bytes, expected_size);
+}
+
+// ---------------------------------------------------------------------------
+// PQ-B: post-quantum export envelope tests
+// ---------------------------------------------------------------------------
+
+/// An exported file is a PQ envelope (magic `VRENV1`), not a raw `vault_format`.
+#[test]
+fn export_produces_pq_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let (db, key) = setup_vault(dir.path());
+    let export_data = export_vault_bytes(&db, &key, dir.path(), EXPORT_PASSWORD);
+
+    assert!(
+        envelope::has_envelope_magic(&export_data),
+        "export must be wrapped in a PQ envelope"
+    );
+    // And the envelope parses + its signature verifies with the embedded key.
+    let parsed = envelope::parse_envelope(&export_data).expect("envelope parses");
+    verrou_crypto_core::signing::verify(
+        parsed.signed_portion,
+        &parsed.signature,
+        &parsed.signing_public,
+    )
+    .expect("embedded signature must verify");
+}
+
+/// Re-importing into the SAME vault recovers the content key via the KEM path,
+/// with NO password needed — proven by passing a deliberately wrong password.
+#[test]
+fn import_via_kem_path_same_vault_without_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let (db, key) = setup_vault(dir.path());
+
+    add_entry(
+        db.connection(),
+        &key,
+        &totp_params("KemEntry", "kem.example", "JBSWY3DPEHPK3PXP"),
+    )
+    .unwrap();
+
+    let export_data = export_vault_bytes(&db, &key, dir.path(), EXPORT_PASSWORD);
+
+    // Validate with a WRONG password but the correct (same-vault) master key.
+    // The KEM path must recover the CEK, so validation succeeds regardless.
+    let preview = validate_verrou_import(
+        db.connection(),
+        &export_data,
+        b"this-password-is-deliberately-wrong",
+        Some(&key),
+    )
+    .expect("KEM path should recover CEK without a valid password");
+    assert_eq!(preview.total_entries, 1);
+
+    // Import back into the same vault (Skip → existing entry is a duplicate).
+    let result = import_verrou_file(
+        db.connection(),
+        &key,
+        &export_data,
+        b"still-the-wrong-password",
+        dir.path(),
+        DuplicateMode::Skip,
+    )
+    .expect("KEM-path import should succeed without a valid password");
+    // The single entry already exists → skipped as a duplicate.
+    assert_eq!(result.skipped_duplicates, 1);
+    assert_eq!(result.imported_entries, 0);
+}
+
+/// Cross-vault import (different master key) succeeds via the password path:
+/// the KEM path fails (wrong vault) and falls back to the inner password slot.
+#[test]
+fn import_cross_vault_falls_back_to_password() {
+    let source_dir = tempfile::tempdir().unwrap();
+    let (source_db, source_key) = setup_vault(source_dir.path());
+    add_entry(
+        source_db.connection(),
+        &source_key,
+        &totp_params("CrossVault", "x.example", "JBSWY3DPEHPK3PXP"),
+    )
+    .unwrap();
+    let export_data =
+        export_vault_bytes(&source_db, &source_key, source_dir.path(), EXPORT_PASSWORD);
+
+    // Different target vault → different KEM key. KEM unwrap fails, password
+    // fallback (correct EXPORT_PASSWORD) succeeds.
+    let target_dir = tempfile::tempdir().unwrap();
+    let (target_db, target_key) = setup_vault(target_dir.path());
+
+    let result = import_verrou_file(
+        target_db.connection(),
+        &target_key,
+        &export_data,
+        EXPORT_PASSWORD,
+        target_dir.path(),
+        DuplicateMode::Skip,
+    )
+    .expect("cross-vault import should succeed via password fallback");
+    assert_eq!(result.imported_entries, 1);
+
+    let entries = list_entries(target_db.connection()).unwrap();
+    assert!(entries.iter().any(|e| e.name == "CrossVault"));
+}
+
+/// A tampered envelope signature is rejected fail-closed, before any decryption.
+#[test]
+fn import_rejects_tampered_signature_fail_closed() {
+    let source_dir = tempfile::tempdir().unwrap();
+    let (source_db, source_key) = setup_vault(source_dir.path());
+    add_entry(
+        source_db.connection(),
+        &source_key,
+        &totp_params("Sig", "sig.example", "JBSWY3DPEHPK3PXP"),
+    )
+    .unwrap();
+    let mut export_data =
+        export_vault_bytes(&source_db, &source_key, source_dir.path(), EXPORT_PASSWORD);
+
+    // Flip the final byte — inside the trailing signature.
+    let last = export_data.len() - 1;
+    export_data[last] ^= 0xFF;
+
+    let target_dir = tempfile::tempdir().unwrap();
+    let (target_db, target_key) = setup_vault(target_dir.path());
+
+    // Both same-vault-key and password are irrelevant: the signature check
+    // fires first and aborts the import.
+    let result = validate_verrou_import(
+        target_db.connection(),
+        &export_data,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    );
+    assert!(result.is_err(), "tampered signature must be rejected");
+    match result.unwrap_err() {
+        VaultError::Import(msg) => {
+            assert!(
+                msg.contains("signature") || msg.contains("envelope"),
+                "expected a signature/envelope rejection, got: {msg}"
+            );
+        }
+        other => panic!("expected Import error, got: {other:?}"),
+    }
+}
+
+/// A tampered envelope BODY (inner blob) is rejected fail-closed by the
+/// signature check, before any decryption is attempted.
+#[test]
+fn import_rejects_tampered_body_fail_closed() {
+    let source_dir = tempfile::tempdir().unwrap();
+    let (source_db, source_key) = setup_vault(source_dir.path());
+    add_entry(
+        source_db.connection(),
+        &source_key,
+        &totp_params("Body", "body.example", "JBSWY3DPEHPK3PXP"),
+    )
+    .unwrap();
+    let export_data =
+        export_vault_bytes(&source_db, &source_key, source_dir.path(), EXPORT_PASSWORD);
+
+    // Flip a byte deep inside the inner-blob region (well past the header and
+    // the KEM/signing-key fields, but before the trailing signature).
+    let parsed = envelope::parse_envelope(&export_data).unwrap();
+    let inner_len = parsed.inner_blob.len();
+    assert!(inner_len > 0);
+    // Locate the inner blob within the full buffer and flip a middle byte.
+    let signed_len = parsed.signed_portion.len();
+    let flip_at = signed_len - (inner_len / 2);
+    let mut tampered = export_data.clone();
+    tampered[flip_at] ^= 0xFF;
+
+    let target_dir = tempfile::tempdir().unwrap();
+    let (target_db, target_key) = setup_vault(target_dir.path());
+
+    let result = validate_verrou_import(
+        target_db.connection(),
+        &tampered,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    );
+    assert!(result.is_err(), "tampered body must be rejected");
+    assert!(
+        matches!(result.unwrap_err(), VaultError::Import(_)),
+        "tampered body should yield an Import error (fail-closed)"
+    );
+}
+
+/// A non-envelope file (e.g. a stripped inner `vault_format` blob) is rejected.
+/// Verrou exports are always PQ envelopes — there is no pre-launch installed
+/// base of the old raw format, and a mandatory envelope guarantees every import
+/// is signature-verified and KEM-wrapped.
+#[test]
+fn import_rejects_non_envelope_file() {
+    let source_dir = tempfile::tempdir().unwrap();
+    let (source_db, source_key) = setup_vault(source_dir.path());
+    add_entry(
+        source_db.connection(),
+        &source_key,
+        &totp_params("Legacy", "legacy.example", "JBSWY3DPEHPK3PXP"),
+    )
+    .unwrap();
+    let export_data =
+        export_vault_bytes(&source_db, &source_key, source_dir.path(), EXPORT_PASSWORD);
+
+    // Strip the envelope to obtain a bare inner `vault_format` blob.
+    let inner = envelope::parse_envelope(&export_data)
+        .unwrap()
+        .inner_blob
+        .to_vec();
+    assert!(
+        !envelope::has_envelope_magic(&inner),
+        "inner blob must not carry the envelope magic"
+    );
+
+    let target_dir = tempfile::tempdir().unwrap();
+    let (target_db, target_key) = setup_vault(target_dir.path());
+
+    // A non-envelope file must be rejected by both validate and import.
+    let validate = validate_verrou_import(
+        target_db.connection(),
+        &inner,
+        EXPORT_PASSWORD,
+        Some(&target_key),
+    );
+    assert!(
+        validate.is_err(),
+        "non-envelope file must be rejected at validate"
+    );
+
+    let imported = import_verrou_file(
+        target_db.connection(),
+        &target_key,
+        &inner,
+        EXPORT_PASSWORD,
+        target_dir.path(),
+        DuplicateMode::Skip,
+    );
+    assert!(
+        imported.is_err(),
+        "non-envelope file must be rejected at import"
+    );
 }

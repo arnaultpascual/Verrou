@@ -1,0 +1,57 @@
+[package]
+name = "verrou-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+# cargo-fuzz requires this crate to sit outside the workspace so it can apply
+# its own sanitizer flags without affecting other crates.  The `[workspace]`
+# table with an empty `members` list achieves that.
+[workspace]
+
+[[bin]]
+name = "fuzz_import_aegis"
+path = "fuzz_targets/fuzz_import_aegis.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_import_twofas"
+path = "fuzz_targets/fuzz_import_twofas.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_import_google_auth"
+path = "fuzz_targets/fuzz_import_google_auth.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_import_verrou"
+path = "fuzz_targets/fuzz_import_verrou.rs"
+test = false
+doc = false
+
+[dependencies]
+# The libfuzzer runtime shim.
+libfuzzer-sys = "0.4"
+
+# The vault crate whose parsers we are exercising.
+verrou-vault = { path = "../crates/verrou-vault" }
+
+# The crypto-core crate — needed for `parse_header_only` / `deserialize`.
+verrou-crypto-core = { path = "../crates/verrou-crypto-core" }
+
+[profile.release]
+# cargo-fuzz builds with --release; keep overflow checks for better crash
+# detection without the full sanitizer suite on every run.
+overflow-checks = true
+# Do NOT strip symbols here — fuzzer reports need backtraces.
+strip = "none"
+# LTO would slow incremental fuzzer rebuilds; leave it off for fuzz targets.
+lto = false
+codegen-units = 16

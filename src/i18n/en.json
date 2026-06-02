@@ -301,7 +301,12 @@
       "restoreFromBackup": "Restore from backup",
       "restoreSelected": "Restore selected backup",
       "restoreSuccess": "Vault restored successfully",
-      "restoring": "Restoring..."
+      "restoring": "Restoring...",
+      "passwordLabel": "Master password",
+      "passwordPlaceholder": "Enter your master password",
+      "passwordRequired": "Password is required to restore.",
+      "invalidPassword": "Incorrect password. Please try again.",
+      "rateLimited": "Too many attempts. Please wait before trying again."
     }
   },
   "entries": {
@@ -1400,7 +1405,25 @@
     "unlocking": "Unlocking...",
     "unpinned": "{{name}} unpinned",
     "usernameCopied": "{{name}} username copied",
-    "verifying": "Verifying..."
+    "verifying": "Verifying...",
+    "detail": {
+      "back": "Back",
+      "username": "Username",
+      "password": "Password",
+      "urls": "URLs",
+      "reveal": "Reveal",
+      "hide": "Hide",
+      "hidingIn": "Hiding in {{seconds}}s",
+      "passwordCopied": "Password copied",
+      "usernameCopied": "Username copied",
+      "codeCopied": "Code copied",
+      "openMainVault": "Open the main vault to view this entry",
+      "copyCode": "Copy code",
+      "revealError": "Incorrect password",
+      "hintsBack": "back",
+      "hintsOpen": "open",
+      "passwordRequired": "Password required"
+    }
   },
   "passwordHealth": {
     "title": "Password Health",

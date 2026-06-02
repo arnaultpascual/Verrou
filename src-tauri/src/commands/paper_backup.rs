@@ -12,7 +12,7 @@
 )]
 
 use serde::Serialize;
-use tauri::{Manager, State};
+use tauri::State;
 use zeroize::Zeroize;
 
 use super::auth_utils::{constant_time_key_eq, err_json};
@@ -133,11 +133,8 @@ pub fn generate_paper_backup_data(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| err_json("INTERNAL_ERROR", "Failed to resolve vault directory."))?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();

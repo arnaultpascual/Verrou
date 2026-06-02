@@ -51,7 +51,7 @@
   height: 20px;
   padding: 2px;
   background: var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--border-radius-xl);
   cursor: pointer;
   transition: background var(--duration-fast) var(--easing-default);
 }

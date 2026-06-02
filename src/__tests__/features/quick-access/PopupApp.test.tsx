@@ -38,17 +38,32 @@ vi.mock("@kobalte/core/toast", () => ({
   toaster: { show: vi.fn(), dismiss: vi.fn(), clear: vi.fn() },
 }));
 
-import { invoke } from "@tauri-apps/api/core";
+// PopupApp routes on vault status from vault/ipc.checkVaultStatus()
+vi.mock("../../../features/vault/ipc", async (importOriginal) => {
+  const orig = await importOriginal<Record<string, unknown>>();
+  return { ...orig, checkVaultStatus: vi.fn(), setVaultDir: vi.fn() };
+});
+
 import { listen } from "@tauri-apps/api/event";
+import { checkVaultStatus } from "../../../features/vault/ipc";
 import { PopupApp } from "../../../features/quick-access/PopupApp";
+
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 describe("PopupApp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    asMock(checkVaultStatus).mockResolvedValue({
+      state: "locked",
+      vaultDir: "/mock",
+    });
   });
 
   it("shows CompactUnlock when vault is locked", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    asMock(checkVaultStatus).mockResolvedValue({
+      state: "locked",
+      vaultDir: "/mock",
+    });
 
     const { getByText } = render(() => <PopupApp />);
 
@@ -58,7 +73,10 @@ describe("PopupApp", () => {
   });
 
   it("shows QuickSearch when vault is unlocked", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    asMock(checkVaultStatus).mockResolvedValue({
+      state: "unlocked",
+      vaultDir: "/mock",
+    });
 
     const { container } = render(() => <PopupApp />);
 
@@ -68,19 +86,20 @@ describe("PopupApp", () => {
     });
   });
 
-  it("calls is_vault_unlocked on mount", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+  it("checks vault status on mount", async () => {
+    asMock(checkVaultStatus).mockResolvedValue({
+      state: "locked",
+      vaultDir: "/mock",
+    });
 
     render(() => <PopupApp />);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("is_vault_unlocked");
+      expect(checkVaultStatus).toHaveBeenCalled();
     });
   });
 
   it("listens for vault-locked event", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockResolvedValue(false);
-
     render(() => <PopupApp />);
 
     await waitFor(() => {
@@ -92,15 +111,16 @@ describe("PopupApp", () => {
   });
 
   it("transitions to locked state on vault-locked event", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    asMock(checkVaultStatus).mockResolvedValue({
+      state: "unlocked",
+      vaultDir: "/mock",
+    });
 
     let lockCallback: (() => void) | undefined;
-    (listen as ReturnType<typeof vi.fn>).mockImplementation(
-      (_event: string, cb: () => void) => {
-        lockCallback = cb;
-        return Promise.resolve(() => {});
-      },
-    );
+    asMock(listen).mockImplementation((_event: string, cb: () => void) => {
+      lockCallback = cb;
+      return Promise.resolve(() => {});
+    });
 
     const { getByText, container } = render(() => <PopupApp />);
 
@@ -119,8 +139,8 @@ describe("PopupApp", () => {
     });
   });
 
-  it("defaults to locked state on invoke error", async () => {
-    (invoke as ReturnType<typeof vi.fn>).mockRejectedValue("Connection failed");
+  it("defaults to locked state on status error", async () => {
+    asMock(checkVaultStatus).mockRejectedValue("Connection failed");
 
     const { getByText } = render(() => <PopupApp />);
 

@@ -217,7 +217,7 @@
 .noteTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .noteTag {

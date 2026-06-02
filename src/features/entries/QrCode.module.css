@@ -1,5 +1,5 @@
 .canvas {
   display: block;
   border-radius: var(--radius-sm);
-  background: #ffffff;
+  background: white;
 }

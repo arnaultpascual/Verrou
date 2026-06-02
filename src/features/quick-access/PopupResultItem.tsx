@@ -1,9 +1,6 @@
 import type { Component } from "solid-js";
-import { Show, createSignal, createEffect } from "solid-js";
+import { Show } from "solid-js";
 import type { EntryMetadataDto } from "../entries/ipc";
-import { useTotpCode } from "../entries/useTotpCode";
-import { formatTotpCode } from "../entries/formatCode";
-import { CountdownRing } from "../entries/CountdownRing";
 import { TypeBadge } from "../entries/TypeBadge";
 import { Icon } from "../../components/Icon";
 import styles from "./PopupResultItem.module.css";
@@ -18,12 +15,10 @@ export interface PopupResultItemProps {
 
 /**
  * Single entry row in the popup result list.
- * Shows type badge, name, issuer, and live TOTP code for TOTP entries.
+ * Shows type badge, name, issuer, and pin toggle.
+ * Click/Enter opens the detail view.
  */
 export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
-  const isTotpEntry = () => props.entry.entryType === "totp";
-  const isCredentialEntry = () => props.entry.entryType === "credential";
-
   return (
     <div
       id={`popup-result-${props.index}`}
@@ -38,9 +33,6 @@ export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
         <span class={styles.name}>{props.entry.name}</span>
         <Show when={props.entry.issuer}>
           <span class={styles.issuer}>{props.entry.issuer}</span>
-        </Show>
-        <Show when={isCredentialEntry() && props.entry.username}>
-          <span class={styles.username}>{props.entry.username}</span>
         </Show>
       </div>
 
@@ -64,51 +56,6 @@ export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
           <Icon name="star" size={12} />
         </button>
       </Show>
-
-      <div class={styles.codeArea}>
-        <Show when={isTotpEntry()} fallback={
-          <Show when={isCredentialEntry()} fallback={<span class={styles.masked}>&#183;&#183;&#183;</span>}>
-            <span class={styles.credentialHint}>
-              <Icon name="key" size={12} />
-              <span class={styles.masked}>&#8226;&#8226;&#8226;&#8226;</span>
-            </span>
-          </Show>
-        }>
-          <TotpDisplay entryId={props.entry.id} period={props.entry.period} digits={props.entry.digits} />
-        </Show>
-      </div>
-    </div>
-  );
-};
-
-/** Live TOTP code display with countdown ring. */
-const TotpDisplay: Component<{ entryId: string; period: number; digits: number }> = (props) => {
-  const { code, remainingSeconds } = useTotpCode(props.entryId, props.period);
-  const [announcement, setAnnouncement] = createSignal("");
-
-  // Announce "Code refreshed" on period boundary (not every second)
-  let prevCode: string | undefined;
-  createEffect(() => {
-    const current = code();
-    if (prevCode !== undefined && current !== prevCode) {
-      setAnnouncement("Code refreshed");
-      setTimeout(() => setAnnouncement(""), 2000);
-    }
-    prevCode = current;
-  });
-
-  return (
-    <div class={styles.totpGroup}>
-      <span
-        class={styles.code}
-        aria-label={`Code: ${code()}, ${remainingSeconds()} seconds remaining`}
-      >
-        {formatTotpCode(code(), props.digits)}
-      </span>
-      <CountdownRing remaining={remainingSeconds()} period={props.period} />
-      <span class={styles.srOnly} aria-live="polite" role="status">
-        {announcement()}
-      </span>
     </div>
   );
 };

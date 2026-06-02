@@ -22,6 +22,8 @@ const ICON_PATHS: Record<string, string> = {
     "M18 8h-1V6A5 5 0 007 6v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zM9 8V6a3 3 0 116 0v2H9z",
   spinner:
     "M12 2a10 10 0 00-7.07 2.93l1.41 1.41A8 8 0 0112 4V2z",
+  "chevron-left":
+    "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59z",
   "chevron-right":
     "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z",
   plus:

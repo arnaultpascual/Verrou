@@ -13,7 +13,7 @@
 )]
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::State;
 use zeroize::Zeroize;
 
 use crate::state::ManagedVaultState;
@@ -860,7 +860,16 @@ pub fn get_entry(
             .map_err(|e| map_vault_error(&e))?
     };
 
-    let secret = extract_secret(&entry.data);
+    // SeedPhrase and RecoveryCode secrets are gated behind re-authentication
+    // (reveal_seed_phrase / reveal_recovery_codes).  Under the "WebView is
+    // untrusted" threat model, returning raw BIP39 words or recovery codes via
+    // session-only auth would bypass that gate.  Return an empty secret here;
+    // the metadata/edit UI works without the plaintext secret.
+    let secret = match &entry.data {
+        verrou_vault::EntryData::SeedPhrase { .. }
+        | verrou_vault::EntryData::RecoveryCode { .. } => String::new(),
+        _ => extract_secret(&entry.data),
+    };
     let tags = extract_tags(&entry.data);
 
     Ok(EntryDetailDto {
@@ -1206,11 +1215,8 @@ pub fn delete_entry_with_auth(
         }
 
         // Read vault header for password slot and KDF params.
-        let vault_path = app
-            .path()
-            .app_data_dir()
+        let header_path = crate::paths::vault_header_file(&app)
             .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-        let header_path = vault_path.join("vault.verrou");
 
         if !header_path.exists() {
             password.zeroize();
@@ -1331,11 +1337,8 @@ pub fn reveal_seed_phrase(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();
@@ -1473,11 +1476,8 @@ pub fn reveal_recovery_codes(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();
@@ -1756,11 +1756,8 @@ pub fn toggle_recovery_code_used(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();
@@ -1971,11 +1968,8 @@ pub fn update_recovery_codes(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();
@@ -2238,11 +2232,8 @@ pub fn reveal_password(
     }
 
     // Step 2: Read vault header to get password slot and KDF params.
-    let vault_path = app
-        .path()
-        .app_data_dir()
+    let header_path = crate::paths::vault_header_file(&app)
         .map_err(|_| "Failed to resolve vault directory.".to_string())?;
-    let header_path = vault_path.join("vault.verrou");
 
     if !header_path.exists() {
         password.zeroize();
@@ -3469,5 +3460,97 @@ mod tests {
             "unlinked should NOT match"
         );
         assert_ne!(none.as_deref(), Some(parent_id), "None should NOT match");
+    }
+
+    // ─── H1 fix: get_entry must not return secret for seed_phrase / recovery_code ───
+
+    /// The gate logic used inside `get_entry`: `SeedPhrase` and `RecoveryCode` entries
+    /// must return an empty secret; all other types must still return the secret.
+    /// This mirrors the match arm added to `get_entry` verbatim.
+    fn get_entry_secret_for(data: &verrou_vault::EntryData) -> String {
+        match data {
+            verrou_vault::EntryData::SeedPhrase { .. }
+            | verrou_vault::EntryData::RecoveryCode { .. } => String::new(),
+            _ => extract_secret(data),
+        }
+    }
+
+    #[test]
+    fn get_entry_seed_phrase_secret_is_empty() {
+        let data = verrou_vault::EntryData::SeedPhrase {
+            words: vec![
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "abandon".into(),
+                "about".into(),
+            ],
+            passphrase: None,
+        };
+        let secret = get_entry_secret_for(&data);
+        assert!(
+            secret.is_empty(),
+            "get_entry must NOT return seed phrase words under session-only auth; \
+             use reveal_seed_phrase (re-auth required) instead"
+        );
+    }
+
+    #[test]
+    fn get_entry_recovery_code_secret_is_empty() {
+        let data = verrou_vault::EntryData::RecoveryCode {
+            codes: vec!["ABCD-1234".into(), "EFGH-5678".into()],
+            used: vec![],
+            linked_entry_id: None,
+        };
+        let secret = get_entry_secret_for(&data);
+        assert!(
+            secret.is_empty(),
+            "get_entry must NOT return recovery codes under session-only auth; \
+             use reveal_recovery_codes (re-auth required) instead"
+        );
+    }
+
+    #[test]
+    fn get_entry_totp_secret_still_returned() {
+        let data = verrou_vault::EntryData::Totp {
+            secret: "JBSWY3DPEHPK3PXP".into(),
+        };
+        let secret = get_entry_secret_for(&data);
+        assert_eq!(
+            secret, "JBSWY3DPEHPK3PXP",
+            "get_entry should still return TOTP secret (no re-auth gate for TOTP)"
+        );
+    }
+
+    #[test]
+    fn get_entry_hotp_secret_still_returned() {
+        let data = verrou_vault::EntryData::Hotp {
+            secret: "BASE32SECRET".into(),
+        };
+        let secret = get_entry_secret_for(&data);
+        assert_eq!(
+            secret, "BASE32SECRET",
+            "get_entry should still return HOTP secret"
+        );
+    }
+
+    #[test]
+    fn get_entry_secure_note_secret_still_returned() {
+        let data = verrou_vault::EntryData::SecureNote {
+            body: "My private note.".into(),
+            tags: vec![],
+        };
+        let secret = get_entry_secret_for(&data);
+        assert_eq!(
+            secret, "My private note.",
+            "get_entry should still return SecureNote body"
+        );
     }
 }

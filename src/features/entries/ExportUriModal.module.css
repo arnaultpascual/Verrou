@@ -85,7 +85,7 @@
 
 .qrWrapper {
   padding: var(--spacing-sm);
-  background: #ffffff;
+  background: white;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }

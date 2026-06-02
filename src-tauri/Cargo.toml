@@ -38,6 +38,7 @@ clipboard-win = "5"
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -1,10 +1,11 @@
 import type { Component } from "solid-js";
 import { createSignal, onMount, For, Show } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listEntries, generateTotpCode, copyToClipboard, updateEntry } from "../entries/ipc";
+import { listEntries, updateEntry } from "../entries/ipc";
 import { filterEntries } from "../entries/filterEntries";
 import type { EntryMetadataDto } from "../entries/ipc";
 import { PopupResultItem } from "./PopupResultItem";
+import { EntryDetailView } from "./EntryDetailView";
 import { useToast } from "../../components/useToast";
 import { Icon } from "../../components/Icon";
 import { t } from "../../stores/i18nStore";
@@ -13,13 +14,13 @@ import styles from "./QuickSearch.module.css";
 /**
  * Quick search interface for the popup window.
  * Auto-focuses search input, filters entries in real-time,
- * supports keyboard navigation and copy-on-Enter.
+ * supports keyboard navigation and detail view per entry.
  */
 export const QuickSearch: Component = () => {
   const [query, setQuery] = createSignal("");
   const [entries, setEntries] = createSignal<EntryMetadataDto[]>([]);
   const [selectedIndex, setSelectedIndex] = createSignal(0);
-  const [copyFeedback, setCopyFeedback] = createSignal("");
+  const [selectedEntry, setSelectedEntry] = createSignal<EntryMetadataDto | null>(null);
   const toast = useToast();
   let inputRef: HTMLInputElement | undefined;
 
@@ -36,7 +37,23 @@ export const QuickSearch: Component = () => {
     inputRef?.focus();
   });
 
+  const openSelectedEntry = () => {
+    const items = filtered();
+    const idx = selectedIndex();
+    if (idx < 0 || idx >= items.length) return;
+    setSelectedEntry(items[idx]);
+  };
+
+  const handleBack = () => {
+    setSelectedEntry(null);
+    // Refocus search input on next tick
+    setTimeout(() => inputRef?.focus(), 0);
+  };
+
   const handleKeyDown = async (e: KeyboardEvent) => {
+    // When in detail view, only Escape is handled (by EntryDetailView itself)
+    if (selectedEntry()) return;
+
     const count = resultCount();
 
     switch (e.key) {
@@ -52,59 +69,13 @@ export const QuickSearch: Component = () => {
 
       case "Enter":
         e.preventDefault();
-        await copySelectedEntry();
+        openSelectedEntry();
         break;
 
       case "Escape":
         e.preventDefault();
         await getCurrentWindow().hide();
         break;
-    }
-  };
-
-  const copySelectedEntry = async () => {
-    const items = filtered();
-    const idx = selectedIndex();
-    if (idx < 0 || idx >= items.length) return;
-
-    const entry = items[idx];
-
-    if (entry.entryType === "credential") {
-      if (entry.username) {
-        try {
-          await copyToClipboard(entry.username);
-          setCopyFeedback(t("quickAccess.usernameCopied", { name: entry.name }));
-          toast.success(t("quickAccess.usernameCopied", { name: entry.name }));
-          setTimeout(async () => {
-            await getCurrentWindow().hide();
-            setCopyFeedback("");
-          }, 500);
-        } catch {
-          toast.error(t("quickAccess.copyUsernameFailed"));
-        }
-      } else {
-        toast.info(t("quickAccess.openVaultToCopy"));
-      }
-      return;
-    }
-
-    if (entry.entryType !== "totp") return;
-
-    try {
-      const result = await generateTotpCode(entry.id);
-      await copyToClipboard(result.code);
-      setCopyFeedback(t("quickAccess.codeCopied", { name: entry.name }));
-      toast.success(t("quickAccess.codeCopied", { name: entry.name }));
-
-      // Auto-clear is handled by the Rust backend (scheduled in clipboard_write_concealed)
-
-      // Auto-dismiss popup after brief delay
-      setTimeout(async () => {
-        await getCurrentWindow().hide();
-        setCopyFeedback("");
-      }, 500);
-    } catch {
-      toast.error(t("quickAccess.copyCodeFailed"));
     }
   };
 
@@ -125,78 +96,79 @@ export const QuickSearch: Component = () => {
   const handleInput = (e: InputEvent) => {
     const target = e.currentTarget as HTMLInputElement;
     setQuery(target.value);
-    setSelectedIndex(0); // Reset selection on new input
+    setSelectedIndex(0);
   };
 
   return (
     <div class={styles.wrapper} onKeyDown={handleKeyDown}>
-      <div class={styles.searchRow}>
-        <Icon name="search" size={16} class={styles.searchIcon} />
-        <input
-          ref={inputRef}
-          class={styles.searchInput}
-          type="text"
-          placeholder={t("quickAccess.searchPlaceholder")}
-          value={query()}
-          onInput={handleInput}
-          role="combobox"
-          aria-expanded="true"
-          aria-controls="popup-results"
-          aria-activedescendant={
-            resultCount() > 0 ? `popup-result-${selectedIndex()}` : undefined
-          }
-          autocomplete="off"
-          spellcheck={false}
-        />
-      </div>
-
-      <div
-        class={styles.resultCount}
-        aria-live="polite"
-      >
-        {t("quickAccess.resultCount", { count: String(resultCount()) })}
-      </div>
-
-      <div
-        id="popup-results"
-        class={styles.resultList}
-        role="listbox"
-        aria-label={t("quickAccess.ariaSearchResults")}
-      >
-        <For each={filtered()}>
-          {(entry, index) => (
-            <PopupResultItem
-              entry={entry}
-              isSelected={index() === selectedIndex()}
-              index={index()}
-              onSelect={() => {
-                setSelectedIndex(index());
-                copySelectedEntry();
-              }}
-              onTogglePin={handleTogglePin}
+      <Show when={selectedEntry()} fallback={
+        <>
+          <div class={styles.searchRow}>
+            <Icon name="search" size={16} class={styles.searchIcon} />
+            <input
+              ref={inputRef}
+              class={styles.searchInput}
+              type="text"
+              placeholder={t("quickAccess.searchPlaceholder")}
+              value={query()}
+              onInput={handleInput}
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="popup-results"
+              aria-activedescendant={
+                resultCount() > 0 ? `popup-result-${selectedIndex()}` : undefined
+              }
+              autocomplete="off"
+              spellcheck={false}
             />
-          )}
-        </For>
-        <Show when={resultCount() === 0 && entries().length > 0}>
-          <div class={styles.emptyState}>{t("quickAccess.noMatching")}</div>
-        </Show>
-        <Show when={entries().length === 0}>
-          <div class={styles.emptyState}>{t("quickAccess.noEntries")}</div>
-        </Show>
-      </div>
+          </div>
 
-      <Show when={copyFeedback()}>
-        <div class={styles.copyToast} aria-live="polite" role="status">
-          <Icon name="check" size={14} />
-          <span>{copyFeedback()}</span>
-        </div>
+          <div
+            class={styles.resultCount}
+            aria-live="polite"
+          >
+            {t("quickAccess.resultCount", { count: String(resultCount()) })}
+          </div>
+
+          <div
+            id="popup-results"
+            class={styles.resultList}
+            role="listbox"
+            aria-label={t("quickAccess.ariaSearchResults")}
+          >
+            <For each={filtered()}>
+              {(entry, index) => (
+                <PopupResultItem
+                  entry={entry}
+                  isSelected={index() === selectedIndex()}
+                  index={index()}
+                  onSelect={() => {
+                    setSelectedIndex(index());
+                    setSelectedEntry(entry);
+                  }}
+                  onTogglePin={handleTogglePin}
+                />
+              )}
+            </For>
+            <Show when={resultCount() === 0 && entries().length > 0}>
+              <div class={styles.emptyState}>{t("quickAccess.noMatching")}</div>
+            </Show>
+            <Show when={entries().length === 0}>
+              <div class={styles.emptyState}>{t("quickAccess.noEntries")}</div>
+            </Show>
+          </div>
+
+          <div class={styles.hints}>
+            <span>&#8593;&#8595; {t("quickAccess.hintNavigate")}</span>
+            <span>&#9166; {t("quickAccess.detail.hintsOpen")}</span>
+            <span>esc {t("quickAccess.hintClose")}</span>
+          </div>
+        </>
+      }>
+        {(entry) => (
+          <EntryDetailView entry={entry()} onBack={handleBack} />
+        )}
       </Show>
-
-      <div class={styles.hints}>
-        <span>&#8593;&#8595; {t("quickAccess.hintNavigate")}</span>
-        <span>&#9166; {t("quickAccess.hintCopy")}</span>
-        <span>esc {t("quickAccess.hintClose")}</span>
-      </div>
     </div>
   );
 };

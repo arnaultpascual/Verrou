@@ -4,14 +4,20 @@
 //! It registers plugins, defines IPC commands, and wires up
 //! the frontend to `verrou-vault` and `verrou-crypto-core`.
 
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 pub mod commands;
 pub mod platform;
 pub mod state;
 
-// TODO: Centralized runtime path resolution
-// pub mod paths;
+pub mod paths;
 
 use std::sync::{Arc, Mutex};
 
@@ -27,7 +33,11 @@ use state::{ManagedAutoLockState, ManagedPreferencesState, ManagedVaultState};
 ///
 /// Panics if the Tauri runtime fails to initialize (missing system
 /// dependencies, invalid configuration, or resource allocation failure).
-#[allow(clippy::too_many_lines)]
+// INVARIANT for the `.expect("error building VERROU")` below: Tauri's `build()` can only fail
+// on missing/invalid Tauri config or asset resolution errors, both of which are caught at compile
+// time by `generate_context!`. A failure here means the binary is corrupted and there is no
+// graceful recovery path — fail fast.
+#[allow(clippy::too_many_lines, clippy::expect_used)]
 pub fn run() {
     let vault_state: ManagedVaultState = Arc::new(Mutex::new(None));
     let auto_lock_state: ManagedAutoLockState = Arc::new(Mutex::new(None));
@@ -51,7 +61,7 @@ pub fn run() {
         .plugin(tauri_plugin_positioner::init())
         .setup(|app| {
             // ── Load preferences ──────────────────────────────────
-            let data_dir = app.path().app_data_dir()?;
+            let data_dir = paths::app_data_dir(app.handle())?;
             if !data_dir.exists() {
                 std::fs::create_dir_all(&data_dir)?;
             }

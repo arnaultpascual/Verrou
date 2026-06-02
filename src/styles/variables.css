@@ -61,9 +61,11 @@
   --border-subtle: 1px solid var(--border-color-subtle);
   --border-default: 1px solid var(--border-color-default);
   --border-strong: 1px solid var(--border-color-strong);
+  --border-radius-xs: 3px;             /* Tight rounding (chips, small controls) */
   --border-radius-sm: 4px;             /* Subtle rounding */
   --border-radius-md: 6px;             /* Cards, inputs */
   --border-radius-lg: 8px;             /* Modals, large panels */
+  --border-radius-xl: 10px;            /* Large rounded surfaces */
 
   /* ── Focus ── */
   --color-focus-ring: rgba(123, 140, 168, 0.5);
@@ -109,8 +111,12 @@
   --line-height-tight: 1.2;
   --line-height-normal: 1.5;
 
+  --letter-spacing-xs: 0.02em;    /* Subtle UI tracking */
+  --letter-spacing-sm: 0.04em;
   --letter-spacing-wide: 0.05em;  /* Recovery keys, fingerprints, section labels */
+  --letter-spacing-md: 0.06em;
   --letter-spacing-title: 0.08em; /* App header title */
+  --letter-spacing-lg: 0.1em;     /* Wide label tracking */
   --letter-spacing-otp: 0.15em;  /* Monospaced OTP codes */
   --font-size-otp: 1.25rem;    /* 20px — large enough to read at a glance */
   --font-weight-otp: 600;      /* Semibold for emphasis */

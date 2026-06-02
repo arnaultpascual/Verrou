@@ -3,7 +3,14 @@
 //! This crate is the audit target: zero network, zero async, zero Tauri dependencies.
 //! Must remain < 30 direct dependencies and < 10,000 LOC.
 
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 pub mod error;
 pub mod memory;
@@ -39,7 +46,8 @@ pub use error::CryptoError;
 pub use hardware_key::{derive_hardware_wrapping_key, generate_hardware_token};
 pub use kdf::{calibrate, derive, Argon2idParams, CalibratedPresets, KdfPreset};
 pub use kem::{
-    decapsulate, encapsulate, generate_keypair, HybridCiphertext, HybridKeyPair, HybridPublicKey,
+    decapsulate, derive_keypair, encapsulate, generate_keypair, HybridCiphertext, HybridKeyPair,
+    HybridPublicKey,
 };
 pub use memory::{disable_core_dumps, LockedRegion, SecretBuffer, SecretBytes};
 pub use password::{
@@ -47,8 +55,8 @@ pub use password::{
     DEFAULT_PASSWORD_LENGTH, DEFAULT_WORD_COUNT,
 };
 pub use signing::{
-    generate_signing_keypair, sign, verify, HybridSignature, HybridSigningKeyPair,
-    HybridSigningPublicKey,
+    derive_signing_keypair, generate_signing_keypair, sign, verify, HybridSignature,
+    HybridSigningKeyPair, HybridSigningPublicKey,
 };
 pub use slots::{create_slot, unwrap_slot, KeySlot, SlotType, MASTER_KEY_LEN, WRAPPING_KEY_LEN};
 pub use symmetric::{decrypt, encrypt, SealedData};

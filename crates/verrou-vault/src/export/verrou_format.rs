@@ -23,10 +23,14 @@ use verrou_crypto_core::kdf;
 use verrou_crypto_core::memory::SecretBytes;
 use verrou_crypto_core::slots::{self, SlotType};
 use verrou_crypto_core::vault_format::{self, VaultHeader, FORMAT_VERSION};
+use verrou_crypto_core::{kem, signing, symmetric};
 
 use crate::attachments;
 use crate::entries::{self, Algorithm, EntryData, EntryType};
 use crate::error::VaultError;
+use crate::export::envelope::{
+    self, EnvelopeParts, KEM_CEK_AAD, VAULT_KEM_CONTEXT, VAULT_SIGN_CONTEXT,
+};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -134,15 +138,22 @@ pub struct ExportResult {
 // Core export function
 // ---------------------------------------------------------------------------
 
-/// Export the entire vault as an encrypted `.verrou` file.
+/// Export the entire vault as an encrypted `.verrou` file wrapped in a
+/// post-quantum (`PQ-B`) envelope.
 ///
 /// # Flow
 ///
 /// 1. Re-authenticate by verifying the password against the vault header
 /// 2. Read and decrypt all entries, folders, and attachments
 /// 3. Serialize the data as a JSON payload
-/// 4. Generate a fresh export master key and password slot
-/// 5. Encrypt and pad the payload using `vault_format::serialize`
+/// 4. Generate a fresh export content key and password slot
+/// 5. Encrypt and pad the payload using `vault_format::serialize` (inner blob)
+/// 6. Derive the vault's KEM + signing keypairs from the master key
+/// 7. Encapsulate the content key to the vault KEM key, sign the whole envelope
+///
+/// The result is the envelope bytes (magic `VRENV1`). The inner blob still
+/// carries a password slot, so the export can also be re-imported with the
+/// password on a *different* vault.
 ///
 /// # Errors
 ///
@@ -213,12 +224,15 @@ pub fn export_vault(
         slot_salts: vec![salt.to_vec()],
     };
 
-    // Step 7: Serialize to encrypted .verrou binary.
-    let export_data =
+    // Step 7: Serialize to the encrypted inner `.verrou` binary blob.
+    let inner_blob =
         vault_format::serialize(&export_header, &payload_json, export_master_key.expose())?;
 
-    // Step 8: Zeroize intermediates.
+    // The plaintext payload is no longer needed.
     payload_json.zeroize();
+
+    // Step 8: Wrap the inner blob in the post-quantum export envelope.
+    let export_data = wrap_in_envelope(req.master_key, export_master_key.expose(), &inner_blob)?;
 
     Ok(ExportResult {
         export_data,
@@ -226,6 +240,47 @@ pub fn export_vault(
         folder_count,
         attachment_count,
     })
+}
+
+/// Wrap an inner `vault_format` blob in the post-quantum export envelope.
+///
+/// Derives the source vault's KEM + signing keypairs from `master_key`,
+/// encapsulates `content_key` to the KEM public key, seals it under the KEM
+/// shared secret, then signs the entire envelope (`magic..inner`) with the
+/// signing keypair and appends the signature.
+///
+/// # Errors
+///
+/// Returns [`VaultError::Crypto`] if any KEM, AEAD, or signing operation fails,
+/// or [`VaultError::Export`] if envelope assembly fails.
+fn wrap_in_envelope(
+    master_key: &[u8],
+    content_key: &[u8],
+    inner_blob: &[u8],
+) -> Result<Vec<u8>, VaultError> {
+    // Derive the vault keypairs deterministically from the master key, matching
+    // the live session derivation contexts so the vault can decrypt its own
+    // exports.
+    let kem_keypair = kem::derive_keypair(master_key, VAULT_KEM_CONTEXT)?;
+    let signing_keypair = signing::derive_signing_keypair(master_key, VAULT_SIGN_CONTEXT)?;
+
+    // Encapsulate a fresh shared secret to the vault KEM public key, then wrap
+    // the export content key under it.
+    let (kem_ciphertext, shared_secret) = kem::encapsulate(&kem_keypair.public)?;
+    let wrapped_cek = symmetric::encrypt(content_key, shared_secret.expose(), KEM_CEK_AAD)?;
+
+    // Assemble the signed portion (magic..inner) and sign it.
+    let parts = EnvelopeParts {
+        kem_ciphertext: &kem_ciphertext,
+        wrapped_cek: &wrapped_cek,
+        signing_public: &signing_keypair.public,
+        inner_blob,
+    };
+    let signed_portion = envelope::assemble_signed_portion(&parts)?;
+    let signature = signing::sign(&signed_portion, &signing_keypair)?;
+
+    envelope::finish_envelope(signed_portion, &signature)
+    // `shared_secret` (SecretBuffer) and both keypairs zeroize on drop here.
 }
 
 // ---------------------------------------------------------------------------

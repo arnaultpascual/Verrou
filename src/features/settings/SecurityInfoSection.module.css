@@ -4,7 +4,7 @@
 
 .title {
   font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-md) 0;
 }
@@ -92,6 +92,6 @@
   color: var(--color-success);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   margin: var(--spacing-sm) 0 0 0;
 }

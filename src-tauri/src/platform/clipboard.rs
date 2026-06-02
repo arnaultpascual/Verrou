@@ -12,7 +12,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 
 // ── Auto-clear timer state ───────────────────────────────────────────
 
@@ -24,7 +24,10 @@ pub type ClipboardTimerState = Arc<Mutex<Option<tauri::async_runtime::JoinHandle
 ///
 /// Cancels any previously scheduled timer before starting a new one.
 /// A timeout of `0` clears the clipboard immediately.
-pub fn schedule_auto_clear(timer_state: &ClipboardTimerState, timeout_ms: u32, app: AppHandle) {
+pub fn schedule_auto_clear<R>(timer_state: &ClipboardTimerState, timeout_ms: u32, app: AppHandle<R>)
+where
+    R: Runtime + 'static,
+{
     cancel_auto_clear(timer_state);
 
     let handle = tauri::async_runtime::spawn(async move {
@@ -62,7 +65,7 @@ pub fn cancel_auto_clear(timer_state: &ClipboardTimerState) {
 /// # Errors
 ///
 /// Returns an error string if the clipboard write fails.
-pub fn write_concealed(text: &str, app: &AppHandle) -> Result<(), String> {
+pub fn write_concealed<R: Runtime>(text: &str, app: &AppHandle<R>) -> Result<(), String> {
     platform_write_concealed(text, app)
 }
 
@@ -71,7 +74,7 @@ pub fn write_concealed(text: &str, app: &AppHandle) -> Result<(), String> {
 /// # Errors
 ///
 /// Returns an error string if the clipboard clear fails.
-pub fn clear(app: &AppHandle) -> Result<(), String> {
+pub fn clear<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     platform_clear(app)
 }
 
@@ -119,12 +122,12 @@ fn macos_clear() -> Result<(), String> {
 }
 
 #[cfg(target_os = "macos")]
-fn platform_write_concealed(text: &str, _app: &AppHandle) -> Result<(), String> {
+fn platform_write_concealed<R: Runtime>(text: &str, _app: &AppHandle<R>) -> Result<(), String> {
     macos_write_concealed(text)
 }
 
 #[cfg(target_os = "macos")]
-fn platform_clear(_app: &AppHandle) -> Result<(), String> {
+fn platform_clear<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
     macos_clear()
 }
 
@@ -177,19 +180,19 @@ fn windows_clear() -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn platform_write_concealed(text: &str, _app: &AppHandle) -> Result<(), String> {
+fn platform_write_concealed<R: Runtime>(text: &str, _app: &AppHandle<R>) -> Result<(), String> {
     windows_write_concealed(text)
 }
 
 #[cfg(target_os = "windows")]
-fn platform_clear(_app: &AppHandle) -> Result<(), String> {
+fn platform_clear<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
     windows_clear()
 }
 
 // ── Linux fallback ───────────────────────────────────────────────────
 
 #[cfg(target_os = "linux")]
-fn platform_write_concealed(text: &str, app: &AppHandle) -> Result<(), String> {
+fn platform_write_concealed<R: Runtime>(text: &str, app: &AppHandle<R>) -> Result<(), String> {
     use tauri_plugin_clipboard_manager::ClipboardExt;
 
     // No concealment API available on Linux — standard clipboard write
@@ -199,7 +202,7 @@ fn platform_write_concealed(text: &str, app: &AppHandle) -> Result<(), String> {
 }
 
 #[cfg(target_os = "linux")]
-fn platform_clear(app: &AppHandle) -> Result<(), String> {
+fn platform_clear<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     use tauri_plugin_clipboard_manager::ClipboardExt;
 
     app.clipboard()

@@ -1,4 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! Integration tests for `VaultDb` — `SQLCipher` connection, raw key injection,
 //! migration runner, and incorrect key detection.

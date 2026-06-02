@@ -1,0 +1,10 @@
+<svg width="128" height="128" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verrou app icon">
+  <title>Verrou — draft app icon concept (mark on charcoal squircle)</title>
+  <rect width="64" height="64" rx="15" fill="#0F0F14"/>
+  <g transform="translate(8 8)">
+    <path d="M16 24 V19 L24 12.5 L32 19 V24" stroke="#7E84E8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="10" y="23" width="28" height="17" rx="5.5" stroke="#7E84E8" stroke-width="4"/>
+    <circle cx="24" cy="30.5" r="2.3" fill="#7E84E8"/>
+    <path d="M24 32.5 V35.5" stroke="#7E84E8" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

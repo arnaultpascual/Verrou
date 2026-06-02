@@ -103,8 +103,8 @@ describe("PopupResultItem", () => {
     expect(option?.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("shows masked placeholder for non-TOTP entries", () => {
-    const { container } = render(() => (
+  it("renders seed entry as a metadata-only row (no secret/placeholder)", () => {
+    const { container, getByText } = render(() => (
       <PopupResultItem
         entry={SEED_ENTRY}
         isSelected={false}
@@ -113,8 +113,9 @@ describe("PopupResultItem", () => {
       />
     ));
 
-    // Seed phrase entry should show masked dots, not a live code
-    expect(container.textContent).toContain("\u00B7\u00B7\u00B7");
+    // The list row shows name + issuer + badge only \u2014 secrets live in the detail view.
+    expect(getByText("Bitcoin Wallet")).toBeDefined();
+    expect(container.textContent).not.toContain("\u00B7\u00B7\u00B7");
   });
 
   it("has correct id based on index", () => {
@@ -162,8 +163,8 @@ describe("PopupResultItem", () => {
       updatedAt: "2026-01-01T00:00:00Z",
     };
 
-    it("shows key icon and masked dots for credential entries", () => {
-      const { container } = render(() => (
+    it("renders credential row without an inline secret", () => {
+      const { container, getByText } = render(() => (
         <PopupResultItem
           entry={CREDENTIAL_ENTRY}
           isSelected={false}
@@ -171,12 +172,13 @@ describe("PopupResultItem", () => {
           onSelect={onSelect}
         />
       ));
-      // Credential entries show bullet dots (not generic middle dots)
-      expect(container.textContent).toContain("\u2022\u2022\u2022\u2022");
+      // Password badge present, but no masked secret on the fast list path.
+      expect(getByText("Password")).toBeDefined();
+      expect(container.textContent).not.toContain("\u2022\u2022\u2022\u2022");
     });
 
-    it("shows username for credential entries", () => {
-      const { getByText } = render(() => (
+    it("does not show the username on the list row (moved to detail view)", () => {
+      const { queryByText } = render(() => (
         <PopupResultItem
           entry={CREDENTIAL_ENTRY}
           isSelected={false}
@@ -184,7 +186,7 @@ describe("PopupResultItem", () => {
           onSelect={onSelect}
         />
       ));
-      expect(getByText("admin@github.com")).toBeDefined();
+      expect(queryByText("admin@github.com")).toBeNull();
     });
 
     it("renders Password type badge for credential entries", () => {

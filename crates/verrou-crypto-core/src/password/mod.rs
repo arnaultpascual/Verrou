@@ -176,8 +176,10 @@ pub fn generate_random_password(
     // Fisher-Yates shuffle to eliminate positional bias.
     chars.shuffle(&mut rng);
 
-    // Safety: all chars are ASCII.
-    Ok(String::from_utf8(chars).expect("password chars are ASCII"))
+    // INVARIANT: every byte pushed into `chars` comes from `mandatory` or `pool`, which are
+    // built from the ASCII charset constants. `String::from_utf8` therefore cannot fail here.
+    #[allow(clippy::expect_used)]
+    Ok(String::from_utf8(chars).expect("password chars are ASCII by construction"))
 }
 
 /// Generate a passphrase from the EFF large diceware wordlist.
