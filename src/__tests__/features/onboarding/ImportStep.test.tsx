@@ -60,7 +60,7 @@ describe("ImportStep", () => {
 
   it("renders heading and description", () => {
     const { getByText } = renderImportStep();
-    expect(getByText("Import Existing Entries")).toBeDefined();
+    expect(getByText("Import existing entries")).toBeDefined();
     expect(getByText(/import 2FA codes from other apps/)).toBeDefined();
   });
 

@@ -234,22 +234,22 @@ describe("Design Token System", () => {
   // ── Task 7.3: Dark theme is the default ──
 
   describe("Dark theme defaults in :root", () => {
-    it("dark surface-0 matches UX spec #0F0F14", () => {
+    it("dark surface-0 matches Cipher spec #0A0C10", () => {
       const rootMatch = variablesCss.match(/:root\s*\{([^}]+)\}/);
       const tokens = extractTokens(rootMatch![1]);
-      expect(tokens.get("--color-surface-0")).toBe("#0F0F14");
+      expect(tokens.get("--color-surface-0")).toBe("#0A0C10");
     });
 
-    it("dark text-primary matches UX spec #E8E8F0", () => {
+    it("dark text-primary matches Cipher spec #E6EAF2", () => {
       const rootMatch = variablesCss.match(/:root\s*\{([^}]+)\}/);
       const tokens = extractTokens(rootMatch![1]);
-      expect(tokens.get("--color-text-primary")).toBe("#E8E8F0");
+      expect(tokens.get("--color-text-primary")).toBe("#E6EAF2");
     });
 
-    it("dark primary color matches UX spec #7B8CA8", () => {
+    it("dark primary color matches Cipher spec #3B82F6", () => {
       const rootMatch = variablesCss.match(/:root\s*\{([^}]+)\}/);
       const tokens = extractTokens(rootMatch![1]);
-      expect(tokens.get("--color-primary")).toBe("#7B8CA8");
+      expect(tokens.get("--color-primary")).toBe("#3B82F6");
     });
   });
 
@@ -277,12 +277,12 @@ describe("Design Token System", () => {
       expect(tokens.get("--color-text-primary")).toBe("#1A1A2E");
     });
 
-    it("light theme defines primary color as #4A5568", () => {
+    it("light theme defines primary color as #2563EB", () => {
       const lightMatch = variablesCss.match(
         /\[data-theme="light"\]\s*\{([^}]+)\}/,
       );
       const tokens = extractTokens(lightMatch![1]);
-      expect(tokens.get("--color-primary")).toBe("#4A5568");
+      expect(tokens.get("--color-primary")).toBe("#2563EB");
     });
 
     it("light theme defines all entry type accents", () => {
@@ -290,10 +290,10 @@ describe("Design Token System", () => {
         /\[data-theme="light"\]\s*\{([^}]+)\}/,
       );
       const tokens = extractTokens(lightMatch![1]);
-      expect(tokens.get("--color-type-totp")).toBe("#4A7C9B");
+      expect(tokens.get("--color-type-totp")).toBe("#2563EB");
       expect(tokens.get("--color-type-seed")).toBe("#7B6B8A");
       expect(tokens.get("--color-type-recovery")).toBe("#8B7355");
-      expect(tokens.get("--color-type-note")).toBe("#5B7B6B");
+      expect(tokens.get("--color-type-note")).toBe("#1E8A5A");
       expect(tokens.get("--color-type-credential")).toBe("#6B7B8B");
     });
   });

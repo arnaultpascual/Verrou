@@ -3,24 +3,33 @@
  *
  * Shows entry metadata (name, issuer, code count, created date) with
  * masked codes and a "Reveal" button requiring re-authentication (AC8).
- * Includes 60s auto-hide countdown matching the SeedViewer pattern.
+ * Uses the shared reveal grammar (`useReveal` + `AutoHideCountdown`): one
+ * re-auth gate, the unified 60s auto-hide, clear-on-lock, clear-on-cleanup.
  * Supports marking codes as used/unused with toggle checkboxes (Story 6.5).
+ *
+ * The reveal payload from `useReveal` is read-only, but the used/unused toggle
+ * mutates the code list in place. We therefore keep a THIN local signal seeded
+ * from the revealed data (via the hook's `onReveal` callback) and update it from
+ * `toggleRecoveryCodeUsed`. The toggle reuses the retained session password and
+ * does NOT restart the countdown (the countdown only starts inside the hook's
+ * `onVerified`). Deletion has its OWN re-auth prompt — `useReveal` governs the
+ * reveal gate only, never delete.
  */
 
 import type { Component } from "solid-js";
-import { Show, For, createSignal, createEffect, on, onCleanup, onMount, createMemo } from "solid-js";
+import { Show, For, createSignal, createMemo } from "solid-js";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/Button";
 import { ReAuthPrompt } from "../../components/ReAuthPrompt";
+import { AutoHideCountdown } from "../../components/AutoHideCountdown";
 import { useToast } from "../../components/useToast";
 import { Icon } from "../../components/Icon";
 import { revealRecoveryCodes, toggleRecoveryCodeUsed, deleteRecoveryCodeEntry } from "./ipc";
 import type { RecoveryCodeDisplay } from "./ipc";
+import { useReveal } from "../entries/useReveal";
 import { AttachmentsSection } from "../attachments/AttachmentsSection";
 import { t } from "../../stores/i18nStore";
 import styles from "./RecoveryCodeDetailModal.module.css";
-
-const AUTO_HIDE_SECONDS = 60;
 
 /** Derive alert severity from remaining code count. */
 function getAlertSeverity(remaining: number): "none" | "warning" | "danger" {
@@ -43,17 +52,30 @@ export interface RecoveryCodeDetailModalProps {
 
 export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = (props) => {
   const toast = useToast();
-  const [revealedData, setRevealedData] = createSignal<RecoveryCodeDisplay | null>(null);
-  const [showReAuth, setShowReAuth] = createSignal(false);
+
+  // Mutable copy of the revealed codes. The reveal payload from `useReveal` is
+  // read-only, so the used/unused toggle drives this thin local signal instead.
+  // Seeded on reveal via `onReveal`, cleared on hide so it never outlives the
+  // revealed gate.
+  const [localCodes, setLocalCodes] = createSignal<RecoveryCodeDisplay | null>(null);
   const [deleteReAuth, setDeleteReAuth] = createSignal(false);
-  const [remaining, setRemaining] = createSignal(AUTO_HIDE_SECONDS);
-  const [sessionPassword, setSessionPassword] = createSignal<string | null>(null);
   const [toggling, setToggling] = createSignal<number | null>(null);
-  let timerHandle: ReturnType<typeof setInterval> | undefined;
+
+  // Shared reveal grammar: re-auth gate, unified 60s auto-hide, clear-on-lock,
+  // clear-on-cleanup. The recovery codes are never copied across IPC except as
+  // the display-safe list returned by revealRecoveryCodes.
+  const reveal = useReveal<RecoveryCodeDisplay>({
+    revealFn: (password) => revealRecoveryCodes(props.entryId, password),
+    onReveal: (data) => setLocalCodes(data),
+    onHide: () => {
+      setLocalCodes(null);
+      setToggling(null);
+    },
+  });
 
   // Sorted code indexes: unused first, then used (stable original order within each group)
   const sortedIndexes = createMemo(() => {
-    const data = revealedData();
+    const data = localCodes();
     if (!data) return [];
     const usedSet = new Set(data.used);
     const indexes = data.codes.map((_, i) => i);
@@ -62,87 +84,10 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
     return [...unused, ...used];
   });
 
-  // Start countdown only on reveal (null → data), not on toggle updates within revealed state
-  let wasRevealed = false;
-  createEffect(on(() => revealedData(), (data) => {
-    if (data && !wasRevealed) {
-      // Fresh reveal: start countdown
-      wasRevealed = true;
-      clearCountdown();
-      setRemaining(AUTO_HIDE_SECONDS);
-      timerHandle = setInterval(() => {
-        setRemaining((prev) => {
-          const next = prev - 1;
-          if (next <= 0) {
-            clearCountdown();
-            handleHide();
-            return 0;
-          }
-          return next;
-        });
-      }, 1000);
-    } else if (!data) {
-      // Hidden: reset state
-      wasRevealed = false;
-      clearCountdown();
-    }
-  }));
-
-  // Listen for vault-locked event
-  onMount(async () => {
-    try {
-      const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-      if (IS_TAURI) {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("verrou://vault-locked", () => {
-          handleHide();
-        });
-        onCleanup(unlisten);
-      }
-    } catch {
-      // Non-Tauri environment
-    }
-  });
-
-  onCleanup(() => {
-    clearCountdown();
-    clearSessionPassword();
-  });
-
-  const clearCountdown = () => {
-    if (timerHandle !== undefined) {
-      clearInterval(timerHandle);
-      timerHandle = undefined;
-    }
-  };
-
-  const clearSessionPassword = () => {
-    setSessionPassword(null);
-  };
-
-  const handleRevealRequest = () => {
-    setShowReAuth(true);
-  };
-
-  const handleVerified = async (password: string) => {
-    // Throws on wrong password — ReAuthPrompt shows the error inline and retries.
-    const data = await revealRecoveryCodes(props.entryId, password);
-    setRevealedData(data);
-    setSessionPassword(password);
-    setShowReAuth(false);
-  };
-
-  const handleHide = () => {
-    clearCountdown();
-    setRevealedData(null);
-    clearSessionPassword();
-  };
-
   const handleClose = () => {
-    clearCountdown();
-    setRevealedData(null);
-    clearSessionPassword();
-    setShowReAuth(false);
+    // Clear any revealed secret + close both re-auth prompts before closing.
+    reveal.hide();
+    reveal.cancelReAuth();
     setDeleteReAuth(false);
     props.onClose();
   };
@@ -160,14 +105,16 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
   };
 
   const handleToggle = async (codeIndex: number) => {
-    const pw = sessionPassword();
+    // Reuse the password retained by the active reveal session. Does NOT restart
+    // the auto-hide countdown — that only starts inside the hook's onVerified.
+    const pw = reveal.sessionPassword();
     if (!pw || toggling() !== null) return;
 
     setToggling(codeIndex);
     try {
       const updated = await toggleRecoveryCodeUsed(props.entryId, codeIndex, pw);
       const isNowUsed = updated.used.includes(codeIndex);
-      setRevealedData(updated);
+      setLocalCodes(updated);
       toast.success(isNowUsed ? t("recovery.detail.markedUsed") : t("recovery.detail.unmarked"));
       props.onStatsChanged?.();
     } catch (err) {
@@ -234,7 +181,7 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
                 <span class={styles.metaValue}>{props.issuer}</span>
               </div>
             </Show>
-            <Show when={revealedData()}>
+            <Show when={localCodes()}>
               {(data) => (
                 <div class={styles.metaRow}>
                   <span class={styles.metaLabel}>{t("recovery.detail.codesLabel")}</span>
@@ -255,99 +202,104 @@ export const RecoveryCodeDetailModal: Component<RecoveryCodeDetailModalProps> = 
 
           <hr class={styles.separator} />
 
-          {/* Code viewer */}
+          {/* Code viewer — gate visibility on the reveal grammar, render from the
+              thin local signal that the toggle mutates. */}
           <Show
-            when={revealedData()}
+            when={reveal.revealed()}
             fallback={
               <div class={styles.maskedContainer}>
                 <div class={styles.maskedCodes}>
                   <Icon name="lock" size={24} />
                   <span>{t("recovery.detail.codesHidden")}</span>
                 </div>
-                <Button variant="primary" onClick={handleRevealRequest}>
+                <Button variant="primary" onClick={reveal.request}>
                   <Icon name="eye" size={16} />
                   {t("recovery.detail.reveal")}
                 </Button>
               </div>
             }
           >
-            {(data) => {
-              const severity = () => getAlertSeverity(data().remainingCodes);
-              return (
-                <div class={styles.revealedContainer}>
-                  {/* Alert banner */}
-                  <Show when={severity() !== "none"}>
-                    <div
-                      class={`${styles.alertBanner} ${severity() === "danger" ? styles.alertDanger : styles.alertWarning}`}
-                      role="alert"
-                    >
-                      <Icon name="alert-triangle" size={16} />
-                      <span>
-                        {severity() === "danger"
-                          ? t("recovery.detail.alertDanger", { name: props.name })
-                          : t("recovery.detail.alertWarning", { name: props.name })}
-                      </span>
-                    </div>
-                  </Show>
+            <Show when={localCodes()}>
+              {(data) => {
+                const severity = () => getAlertSeverity(data().remainingCodes);
+                return (
+                  <div class={styles.revealedContainer}>
+                    {/* Alert banner */}
+                    <Show when={severity() !== "none"}>
+                      <div
+                        class={`${styles.alertBanner} ${severity() === "danger" ? styles.alertDanger : styles.alertWarning}`}
+                        role="alert"
+                      >
+                        <Icon name="alert-triangle" size={16} />
+                        <span>
+                          {severity() === "danger"
+                            ? t("recovery.detail.alertDanger", { name: props.name })
+                            : t("recovery.detail.alertWarning", { name: props.name })}
+                        </span>
+                      </div>
+                    </Show>
 
-                  <div class={styles.timerBar}>
-                    <Icon name="clock" size={14} />
-                    <span>{t("recovery.detail.hidingIn", { seconds: remaining() })}</span>
-                  </div>
-                  <ul class={styles.codeList}>
-                    <For each={sortedIndexes()}>
-                      {(codeIdx) => {
-                        const isUsed = () => data().used.includes(codeIdx);
-                        const anyToggling = () => toggling() !== null;
-                        return (
-                          <li
-                            class={`${styles.codeItem} ${isUsed() ? styles.codeUsed : ""}`}
-                          >
-                            <input
-                              type="checkbox"
-                              class={styles.codeCheckbox}
-                              checked={isUsed()}
-                              disabled={anyToggling()}
-                              aria-label={t("recovery.detail.toggleCodeAria", { n: codeIdx + 1, status: isUsed() ? t("recovery.detail.unused") : t("recovery.detail.used") })}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggle(codeIdx);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
+                    <AutoHideCountdown
+                      remainingMs={reveal.remainingMs()}
+                      onHide={reveal.hide}
+                    />
+                    <ul class={styles.codeList}>
+                      <For each={sortedIndexes()}>
+                        {(codeIdx) => {
+                          const isUsed = () => data().used.includes(codeIdx);
+                          const anyToggling = () => toggling() !== null;
+                          return (
+                            <li
+                              class={`${styles.codeItem} ${isUsed() ? styles.codeUsed : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                class={styles.codeCheckbox}
+                                checked={isUsed()}
+                                disabled={anyToggling()}
+                                aria-label={t("recovery.detail.toggleCodeAria", { n: codeIdx + 1, status: isUsed() ? t("recovery.detail.unused") : t("recovery.detail.used") })}
+                                onClick={(e) => {
                                   e.stopPropagation();
-                                }
-                              }}
-                            />
-                            <span class={styles.codeText}>{data().codes[codeIdx]}</span>
-                            <Show when={isUsed()}>
-                              <span class={styles.usedBadge}>{t("recovery.detail.used")}</span>
-                            </Show>
-                          </li>
-                        );
-                      }}
-                    </For>
-                  </ul>
-                  <div class={styles.revealedActions}>
-                    <Button variant="ghost" onClick={handleHide}>
-                      <Icon name="eye-off" size={16} />
-                      {t("recovery.detail.hide")}
-                    </Button>
+                                  handleToggle(codeIdx);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.stopPropagation();
+                                  }
+                                }}
+                              />
+                              <span class={styles.codeText}>{data().codes[codeIdx]}</span>
+                              <Show when={isUsed()}>
+                                <span class={styles.usedBadge}>{t("recovery.detail.used")}</span>
+                              </Show>
+                            </li>
+                          );
+                        }}
+                      </For>
+                    </ul>
+                    <div class={styles.revealedActions}>
+                      <Button variant="ghost" onClick={reveal.hide}>
+                        <Icon name="eye-off" size={16} />
+                        {t("recovery.detail.hide")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              );
-            }}
+                );
+              }}
+            </Show>
           </Show>
           <AttachmentsSection entryId={props.entryId} />
         </div>
       </Modal>
 
+      {/* Reveal re-auth (governed by useReveal) */}
       <ReAuthPrompt
-        open={showReAuth()}
-        onClose={() => setShowReAuth(false)}
-        onVerified={handleVerified}
+        open={reveal.showReAuth()}
+        onClose={reveal.cancelReAuth}
+        onVerified={reveal.onVerified}
       />
 
+      {/* Delete re-auth (separate gate — not governed by useReveal) */}
       <ReAuthPrompt
         open={deleteReAuth()}
         onClose={() => setDeleteReAuth(false)}

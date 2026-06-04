@@ -1,6 +1,8 @@
 import type { Accessor } from "solid-js";
 import { createSignal } from "solid-js";
 import { useToast } from "../../components/useToast";
+import { clipboardAutoClearMs } from "../../stores/preferencesStore";
+import { t } from "../../stores/i18nStore";
 import { generateTotpCode, copyToClipboard } from "./ipc";
 
 const STALE_THRESHOLD_S = 2;
@@ -40,9 +42,12 @@ export function useCopyOtp(
       }
 
       await copyToClipboard(result.code);
-      toast.success(`${entryName} copied`);
+      const seconds = Math.round(clipboardAutoClearMs() / 1000);
+      // Unified copy grammar — same "{label} copied · clears in {n}s" toast the
+      // reveal flows use, with the entry name as the label.
+      toast.success(t("reveal.copied", { label: entryName, seconds: String(seconds) }));
     } catch {
-      toast.error("Could not copy code");
+      toast.error(t("reveal.copyFailed", { label: entryName }));
     } finally {
       setIsCopying(false);
     }

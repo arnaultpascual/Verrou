@@ -6,12 +6,16 @@
 import type { OtpAlgorithm, OtpDigits, OtpPeriod } from "./otpauth";
 
 export interface AddEntryFormState {
+  /** Time-based (TOTP) or counter-based (HOTP). */
+  entryType: "totp" | "hotp";
   secret: string;
   name: string;
   issuer: string;
   algorithm: OtpAlgorithm;
   digits: OtpDigits;
   period: OtpPeriod;
+  /** Initial counter for HOTP entries (ignored for TOTP). */
+  counter: number;
   pasteInput: string;
   pasteDetected: "uri" | "base32" | "manual" | null;
   showManualForm: boolean;

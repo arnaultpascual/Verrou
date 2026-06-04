@@ -1,7 +1,16 @@
-import { render, fireEvent } from "@solidjs/testing-library";
+import { render, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { KdfPresetStep } from "../../../features/onboarding/KdfPresetStep";
 import { wizardStore, setWizardStore } from "../../../features/onboarding/stores";
+
+// Real calibrated params come from benchmarkKdf — mock it deterministically.
+vi.mock("../../../features/onboarding/ipc", () => ({
+  benchmarkKdf: vi.fn().mockResolvedValue({
+    fast: { mCost: 262144, tCost: 2, pCost: 4 },
+    balanced: { mCost: 524288, tCost: 3, pCost: 4 },
+    maximum: { mCost: 524288, tCost: 4, pCost: 4 },
+  }),
+}));
 
 describe("KdfPresetStep", () => {
   beforeEach(() => {
@@ -95,13 +104,16 @@ describe("KdfPresetStep", () => {
     expect(onValid).toHaveBeenCalledWith(true);
   });
 
-  it("shows timing labels", () => {
+  it("shows the real calibrated parameters per tier (no invented seconds)", async () => {
     const { getByText } = render(() => (
       <KdfPresetStep onValidChange={vi.fn()} />
     ));
-    expect(getByText("~1 second")).toBeDefined();
-    expect(getByText("~2 seconds")).toBeDefined();
-    expect(getByText("~4 seconds")).toBeDefined();
+    // 262144 KiB → 256 MB, 524288 KiB → 512 MB; t_cost = passes.
+    await waitFor(() => {
+      expect(getByText("256 MB memory · 2 passes")).toBeDefined();
+      expect(getByText("512 MB memory · 3 passes")).toBeDefined();
+      expect(getByText("512 MB memory · 4 passes")).toBeDefined();
+    });
   });
 
   it("shows description for each preset", () => {

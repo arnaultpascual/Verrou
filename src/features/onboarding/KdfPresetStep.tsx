@@ -1,15 +1,17 @@
 import type { Component } from "solid-js";
-import { createEffect, For } from "solid-js";
+import { createEffect, createResource, For, Show } from "solid-js";
 import { wizardStore, setWizardStore } from "./stores";
+import { benchmarkKdf } from "./ipc";
 import { t } from "../../stores/i18nStore";
 import styles from "./KdfPresetStep.module.css";
 
+type PresetValue = "fast" | "balanced" | "maximum";
+
 interface PresetOption {
-  value: "fast" | "balanced" | "maximum";
+  value: PresetValue;
   label: string;
   recommended: boolean;
   description: string;
-  timing: string;
 }
 
 const PRESETS: PresetOption[] = [
@@ -18,21 +20,18 @@ const PRESETS: PresetOption[] = [
     label: "onboarding.kdf.fast.label",
     recommended: false,
     description: "onboarding.kdf.fast.description",
-    timing: "onboarding.kdf.fast.timing",
   },
   {
     value: "balanced",
     label: "onboarding.kdf.balanced.label",
     recommended: true,
     description: "onboarding.kdf.balanced.description",
-    timing: "onboarding.kdf.balanced.timing",
   },
   {
     value: "maximum",
     label: "onboarding.kdf.maximum.label",
     recommended: false,
     description: "onboarding.kdf.maximum.description",
-    timing: "onboarding.kdf.maximum.timing",
   },
 ];
 
@@ -41,22 +40,33 @@ export interface KdfPresetStepProps {
 }
 
 export const KdfPresetStep: Component<KdfPresetStepProps> = (props) => {
-  // Always valid — a preset is always selected
+  // Always valid — a preset is always selected.
   createEffect(() => {
     props.onValidChange(true);
   });
 
+  // Calibrate against the real hardware so each tier shows the actual
+  // Argon2id work it will do on THIS device — no invented "~N seconds".
+  const [calibration] = createResource(benchmarkKdf);
+
+  const specFor = (value: PresetValue) => {
+    const presets = calibration();
+    if (!presets) return null;
+    const p = presets[value];
+    // m_cost is in KiB; show whole MB. t_cost is the number of passes.
+    return { memory: Math.round(p.mCost / 1024), passes: p.tCost };
+  };
+
   return (
     <div class={styles.step}>
       <h2 class={styles.heading}>{t("onboarding.kdf.heading")}</h2>
-      <p class={styles.description}>
-        {t("onboarding.kdf.description")}
-      </p>
+      <p class={styles.description}>{t("onboarding.kdf.description")}</p>
 
       <div class={styles.presets} role="radiogroup" aria-label={t("onboarding.kdf.ariaLabel")}>
         <For each={PRESETS}>
           {(preset) => {
             const isSelected = () => wizardStore.kdfPreset === preset.value;
+            const spec = () => specFor(preset.value);
             return (
               <button
                 type="button"
@@ -72,7 +82,16 @@ export const KdfPresetStep: Component<KdfPresetStepProps> = (props) => {
                   )}
                 </div>
                 <p class={styles.presetDescription}>{t(preset.description)}</p>
-                <span class={styles.presetTiming}>{t(preset.timing)}</span>
+                <span class={styles.presetTiming}>
+                  <Show when={spec()} fallback={t("onboarding.kdf.measuring")}>
+                    {(s) =>
+                      t("onboarding.kdf.calibrated", {
+                        memory: String(s().memory),
+                        passes: String(s().passes),
+                      })
+                    }
+                  </Show>
+                </span>
               </button>
             );
           }}

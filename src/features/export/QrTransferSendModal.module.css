@@ -4,6 +4,17 @@
   margin: 0;
 }
 
+/* Cross-device explainer */
+.crossDevice {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-2);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

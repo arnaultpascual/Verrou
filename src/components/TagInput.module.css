@@ -15,7 +15,7 @@
   background: var(--color-surface-2);
   border: var(--border-default);
   border-radius: var(--border-radius-md);
-  min-height: 38px;
+  min-height: calc(var(--spacing-2xl) + var(--spacing-xs));
   cursor: text;
   transition: border-color var(--duration-fast) var(--easing-default);
 }
@@ -30,8 +30,8 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px var(--spacing-xs) 2px var(--spacing-sm);
+  gap: calc(var(--spacing-xs) / 2);
+  padding: calc(var(--spacing-xs) / 2) var(--spacing-xs) calc(var(--spacing-xs) / 2) var(--spacing-sm);
   background: var(--color-surface-3);
   border-radius: var(--border-radius-sm);
   font-size: var(--font-size-xs);
@@ -47,12 +47,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  padding: calc(var(--spacing-xs) / 2);
   background: none;
   border: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: var(--border-radius-xs);
   transition: color var(--duration-fast) var(--easing-default);
 }
 
@@ -64,7 +64,7 @@
 
 .input {
   flex: 1;
-  min-width: 80px;
+  min-width: calc(var(--spacing-3xl) + var(--spacing-2xl));
   border: none;
   background: transparent;
   color: var(--color-text-primary);

@@ -11,6 +11,10 @@ export interface InputProps {
   onInput?: (value: string) => void;
   /** Error message — displays below input in danger color */
   error?: string;
+  /** Helper text shown under the field (announced via aria-describedby) */
+  hint?: string;
+  /** Marks the field required — shows an indicator on the label */
+  required?: boolean;
   /** Input type */
   type?: "text" | "password" | "email" | "url" | "number";
   /** Placeholder text */
@@ -27,12 +31,19 @@ export interface InputProps {
 
 export const Input: Component<InputProps> = (props) => {
   const [local, rest] = splitProps(props, [
-    "label", "value", "onInput", "error", "type", "placeholder",
-    "disabled", "class", "id", "autocomplete",
+    "label", "value", "onInput", "error", "hint", "required", "type",
+    "placeholder", "disabled", "class", "id", "autocomplete",
   ]);
 
   const inputId = local.id ?? createUniqueId();
   const errorId = `${inputId}-error`;
+  const hintId = `${inputId}-hint`;
+
+  // Wire both error and hint into aria-describedby when present.
+  const describedBy = () =>
+    [local.error ? errorId : "", local.hint ? hintId : ""]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   const handleInput: JSX.EventHandler<HTMLInputElement, InputEvent> = (e) => {
     local.onInput?.(e.currentTarget.value);
@@ -42,6 +53,9 @@ export const Input: Component<InputProps> = (props) => {
     <div class={`${styles.wrapper} ${local.class ?? ""}`.trim()}>
       <label class={styles.label} for={inputId}>
         {local.label}
+        <Show when={local.required}>
+          <span class={styles.required} aria-hidden="true">*</span>
+        </Show>
       </label>
       <input
         class={`${styles.input} ${local.error ? styles.inputError : ""}`.trim()}
@@ -50,11 +64,17 @@ export const Input: Component<InputProps> = (props) => {
         value={local.value ?? ""}
         placeholder={local.placeholder}
         disabled={local.disabled}
+        required={local.required}
         autocomplete={local.autocomplete}
         aria-invalid={local.error ? "true" : undefined}
-        aria-describedby={local.error ? errorId : undefined}
+        aria-describedby={describedBy()}
         onInput={handleInput}
       />
+      <Show when={local.hint}>
+        <p class={styles.hint} id={hintId}>
+          {local.hint}
+        </p>
+      </Show>
       <Show when={local.error}>
         <p class={styles.error} id={errorId} role="alert">
           {local.error}

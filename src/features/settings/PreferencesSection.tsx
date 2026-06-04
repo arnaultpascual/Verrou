@@ -2,7 +2,6 @@ import type { Component } from "solid-js";
 import { Show, For } from "solid-js";
 import {
   currentTheme,
-  autoLockTimeoutMinutes,
   launchOnBoot,
   startMinimized,
   preferencesLoaded,
@@ -27,13 +26,6 @@ export const PreferencesSection: Component = () => {
 
   const handleThemeChange = (theme: string) => {
     updatePreferences({ theme });
-  };
-
-  const handleTimeoutChange = (e: Event) => {
-    const value = parseInt((e.target as HTMLInputElement).value, 10);
-    if (value >= 1 && value <= 60) {
-      updatePreferences({ autoLockTimeoutMinutes: value });
-    }
   };
 
   const handleLaunchOnBootChange = async (e: Event) => {
@@ -68,8 +60,8 @@ export const PreferencesSection: Component = () => {
 
   return (
     <Show when={preferencesLoaded()}>
-      <div class={styles.section} data-testid="preferences-section">
-        <h2 class={styles.sectionTitle}>{t("settings.preferences")}</h2>
+      <div class={styles.section} data-testid="preferences-section" data-group="appearance">
+        <h2 class={styles.sectionTitle}>{t("settings.groups.appearance")}</h2>
 
         {/* Theme selector */}
         <div class={styles.fieldGroup} data-testid="theme-selector">
@@ -131,35 +123,6 @@ export const PreferencesSection: Component = () => {
           </select>
           <p class={styles.fieldHint}>
             {t("settings.language.hint")}
-          </p>
-        </div>
-
-        {/* Lock timeout slider */}
-        <div class={styles.fieldGroup} data-testid="lock-timeout">
-          <label class={styles.fieldLabel} for="lock-timeout-slider">
-            {t("settings.autoLock.label")}
-          </label>
-          <div class={styles.sliderRow}>
-            <input
-              id="lock-timeout-slider"
-              type="range"
-              class={styles.slider}
-              min="1"
-              max="60"
-              step="1"
-              value={autoLockTimeoutMinutes()}
-              onInput={handleTimeoutChange}
-              aria-valuemin={1}
-              aria-valuemax={60}
-              aria-valuenow={autoLockTimeoutMinutes()}
-              aria-label={t("settings.autoLock.label")}
-            />
-            <span class={styles.sliderValue} data-testid="timeout-value">
-              {autoLockTimeoutMinutes()} min
-            </span>
-          </div>
-          <p class={styles.fieldHint}>
-            {t("settings.autoLock.hint", { minutes: String(autoLockTimeoutMinutes()) })}
           </p>
         </div>
 

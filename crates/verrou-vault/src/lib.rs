@@ -49,7 +49,8 @@ pub use entries::{
 pub use error::VaultError;
 pub use export::verrou_format::{export_vault, ExportResult, ExportVaultRequest};
 pub use folders::{
-    create_folder, delete_folder, list_folders_with_counts, rename_folder, Folder, FolderListItem,
+    create_folder, create_folder_under, delete_folder, list_folders_with_counts, move_folder,
+    rename_folder, Folder, FolderListItem,
 };
 pub use health::{
     analyze_password_health, evaluate_password_strength, AgeSeverity, CredentialRef, OldCredential,

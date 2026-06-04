@@ -426,8 +426,13 @@ fn extract_template(data: &verrou_vault::EntryData) -> Option<String> {
 /// Extract the secret string from `EntryData` for the detail DTO.
 fn extract_secret(data: &verrou_vault::EntryData) -> String {
     match data {
-        verrou_vault::EntryData::Totp { secret } | verrou_vault::EntryData::Hotp { secret } => {
-            secret.clone()
+        // OTP secrets are NOT returned by get_entry. The display-safe code is
+        // produced server-side (generate_totp_code / generate_hotp_code); the
+        // raw secret leaves Rust only via the re-authenticated reveal_otp_secret
+        // (otpauth:// export). Returning it here would expose every 2FA seed to
+        // the untrusted WebView under session-only auth.
+        verrou_vault::EntryData::Totp { .. } | verrou_vault::EntryData::Hotp { .. } => {
+            String::new()
         }
         verrou_vault::EntryData::SeedPhrase { words, .. } => words.join(" "),
         verrou_vault::EntryData::RecoveryCode { codes, .. } => codes.join("\n"),
@@ -878,6 +883,296 @@ pub fn get_entry(
         counter: entry.counter,
         tags,
     })
+}
+
+// ---------------------------------------------------------------------------
+// OTP code generation — server-side (secrets never cross the IPC boundary)
+// ---------------------------------------------------------------------------
+
+/// TOTP code result. Display-safe: only the code + remaining seconds cross IPC.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TotpCodeDto {
+    /// The current TOTP code (6 or 8 digits).
+    pub code: String,
+    /// Seconds until the code rotates.
+    pub remaining_seconds: u32,
+}
+
+/// HOTP code result. Display-safe. The stored counter is advanced server-side.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HotpCodeDto {
+    /// The generated HOTP code.
+    pub code: String,
+    /// The counter the code was generated from (stored counter is now +1).
+    pub counter: u64,
+}
+
+/// Re-authenticated OTP secret reveal — ONLY for building an `otpauth://`
+/// export URI. The raw Base32 secret leaves Rust solely through this
+/// re-auth-gated path (never via `get_entry`).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtpSecretDto {
+    /// The Base32-encoded OTP secret.
+    pub secret: String,
+}
+
+// Safety: OtpSecretDto carries a raw OTP secret — never log or print it.
+impl std::fmt::Debug for OtpSecretDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("OtpSecretDto(***)")
+    }
+}
+
+/// Decode an RFC 4648 Base32 OTP secret to bytes (tolerant of padding,
+/// whitespace, and lowercase). Zeroized on drop.
+fn decode_otp_secret(secret_b32: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
+    let cleaned: String = secret_b32
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '=')
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    data_encoding::BASE32_NOPAD
+        .decode(cleaned.as_bytes())
+        .map(zeroize::Zeroizing::new)
+        .map_err(|_| "Invalid Base32 secret.".to_string())
+}
+
+/// Map a vault algorithm to the crypto-core OTP algorithm.
+const fn otp_algorithm(algo: verrou_vault::Algorithm) -> verrou_crypto_core::OtpAlgorithm {
+    match algo {
+        verrou_vault::Algorithm::SHA1 => verrou_crypto_core::OtpAlgorithm::Sha1,
+        verrou_vault::Algorithm::SHA256 => verrou_crypto_core::OtpAlgorithm::Sha256,
+        verrou_vault::Algorithm::SHA512 => verrou_crypto_core::OtpAlgorithm::Sha512,
+    }
+}
+
+/// Map a digit count to the crypto-core `OtpDigits` (6 or 8 only).
+fn otp_digits(digits: u32) -> Result<verrou_crypto_core::OtpDigits, String> {
+    match digits {
+        6 => Ok(verrou_crypto_core::OtpDigits::Six),
+        8 => Ok(verrou_crypto_core::OtpDigits::Eight),
+        _ => Err("Unsupported OTP digit count.".to_string()),
+    }
+}
+
+/// Current Unix time in seconds.
+fn unix_now_secs() -> Result<u64, String> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .map_err(|_| "System clock error.".to_string())
+}
+
+/// Generate a TOTP code for an entry.
+///
+/// Session-auth: a TOTP code is the display-safe form. The Base32 secret is
+/// decoded and the code computed entirely in Rust; the secret never crosses
+/// the IPC boundary.
+///
+/// # Errors
+/// Locked vault, entry not found, wrong type, or an invalid secret.
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+pub fn generate_totp_code(
+    entry_id: String,
+    vault_state: State<'_, ManagedVaultState>,
+) -> Result<TotpCodeDto, String> {
+    let state = vault_state
+        .lock()
+        .map_err(|_| "Internal error: failed to acquire vault lock".to_string())?;
+    let session = state
+        .as_ref()
+        .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
+    let entry = verrou_vault::get_entry(session.db.connection(), &session.master_key, &entry_id)
+        .map_err(|e| map_vault_error(&e))?;
+
+    let verrou_vault::EntryData::Totp { secret: secret_b32 } = &entry.data else {
+        return Err("Entry is not a TOTP entry.".to_string());
+    };
+    let secret = decode_otp_secret(secret_b32)?;
+    let now = unix_now_secs()?;
+    let code = verrou_crypto_core::generate_totp(
+        &secret,
+        now,
+        otp_digits(entry.digits)?,
+        entry.period,
+        otp_algorithm(entry.algorithm),
+    )
+    .map_err(|_| "Failed to generate TOTP code.".to_string())?;
+
+    let period = u64::from(entry.period).max(1);
+    let elapsed = now.checked_rem(period).unwrap_or(0);
+    let remaining = period.checked_sub(elapsed).unwrap_or(period);
+    Ok(TotpCodeDto {
+        code,
+        remaining_seconds: remaining as u32,
+    })
+}
+
+/// Generate an HOTP code for an entry and advance the stored counter.
+///
+/// Session-auth. Load → generate → persist `counter + 1` happen under one lock,
+/// so the advance is atomic. The secret never crosses the IPC boundary.
+///
+/// # Errors
+/// Locked vault, entry not found, wrong type, invalid secret, or counter overflow.
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+pub fn generate_hotp_code(
+    entry_id: String,
+    vault_state: State<'_, ManagedVaultState>,
+) -> Result<HotpCodeDto, String> {
+    let state = vault_state
+        .lock()
+        .map_err(|_| "Internal error: failed to acquire vault lock".to_string())?;
+    let session = state
+        .as_ref()
+        .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
+    let entry = verrou_vault::get_entry(session.db.connection(), &session.master_key, &entry_id)
+        .map_err(|e| map_vault_error(&e))?;
+
+    let verrou_vault::EntryData::Hotp { secret: secret_b32 } = &entry.data else {
+        return Err("Entry is not an HOTP entry.".to_string());
+    };
+    let secret = decode_otp_secret(secret_b32)?;
+    let counter = entry.counter;
+    let code = verrou_crypto_core::generate_hotp(
+        &secret,
+        counter,
+        otp_digits(entry.digits)?,
+        otp_algorithm(entry.algorithm),
+    )
+    .map_err(|_| "Failed to generate HOTP code.".to_string())?;
+
+    // Advance + persist the counter (atomic under the held lock).
+    let next = counter
+        .checked_add(1)
+        .ok_or_else(|| "HOTP counter overflow.".to_string())?;
+    let params = verrou_vault::UpdateEntryParams {
+        name: None,
+        issuer: None,
+        folder_id: None,
+        algorithm: None,
+        digits: None,
+        period: None,
+        counter: Some(next),
+        pinned: None,
+        tags: None,
+        data: None,
+    };
+    verrou_vault::update_entry(
+        session.db.connection(),
+        &session.master_key,
+        &entry_id,
+        &params,
+    )
+    .map_err(|e| map_vault_error(&e))?;
+
+    Ok(HotpCodeDto { code, counter })
+}
+
+/// Reveal an entry's raw OTP secret — re-authenticated, for `otpauth://`
+/// export only. This is the ONLY path that returns a raw OTP secret across the
+/// IPC boundary; it requires the master password.
+///
+/// # Errors
+/// Locked vault, wrong password, entry not found, or wrong entry type.
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+pub fn reveal_otp_secret(
+    entry_id: String,
+    mut password: String,
+    app: tauri::AppHandle,
+    vault_state: State<'_, ManagedVaultState>,
+) -> Result<OtpSecretDto, String> {
+    // Step 1: copy the session master key for comparison.
+    let mut master_key_copy = [0u8; 32];
+    {
+        let state = vault_state
+            .lock()
+            .map_err(|_| "Internal error: failed to acquire vault lock".to_string())?;
+        let session = state
+            .as_ref()
+            .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
+        master_key_copy.copy_from_slice(session.master_key.expose());
+    }
+
+    // Steps 2-4: re-authenticate against the password slot (mirrors reveal_password).
+    let header_path = crate::paths::vault_header_file(&app).map_err(|_| {
+        master_key_copy.zeroize();
+        password.zeroize();
+        "Failed to resolve vault directory.".to_string()
+    })?;
+    let file_data = std::fs::read(&header_path).map_err(|_| {
+        master_key_copy.zeroize();
+        password.zeroize();
+        "Failed to read vault header.".to_string()
+    })?;
+    let header = verrou_crypto_core::vault_format::parse_header_only(&file_data).map_err(|_| {
+        master_key_copy.zeroize();
+        password.zeroize();
+        "Failed to parse vault header.".to_string()
+    })?;
+    let (slot_index, password_slot) = header
+        .slots
+        .iter()
+        .enumerate()
+        .find(|(_, s)| s.slot_type == verrou_crypto_core::slots::SlotType::Password)
+        .ok_or_else(|| {
+            master_key_copy.zeroize();
+            password.zeroize();
+            "No password slot found.".to_string()
+        })?;
+    let password_slot = password_slot.clone();
+    let salt = header
+        .slot_salts
+        .get(slot_index)
+        .ok_or_else(|| {
+            master_key_copy.zeroize();
+            password.zeroize();
+            "Missing salt for password slot.".to_string()
+        })?
+        .clone();
+    let wrapping_key =
+        verrou_crypto_core::kdf::derive(password.as_bytes(), &salt, &header.session_params)
+            .map_err(|_| {
+                master_key_copy.zeroize();
+                password.zeroize();
+                "Key derivation failed.".to_string()
+            })?;
+    password.zeroize();
+    let recovered_key =
+        verrou_crypto_core::slots::unwrap_slot(&password_slot, wrapping_key.expose()).map_err(
+            |_| {
+                master_key_copy.zeroize();
+                "Incorrect password. Secret not revealed.".to_string()
+            },
+        )?;
+    if !constant_time_key_eq(recovered_key.expose(), &master_key_copy) {
+        master_key_copy.zeroize();
+        return Err("Incorrect password. Secret not revealed.".to_string());
+    }
+    master_key_copy.zeroize();
+
+    // Step 5: password verified — fetch the entry and return the OTP secret.
+    let state = vault_state
+        .lock()
+        .map_err(|_| "Internal error: failed to acquire vault lock".to_string())?;
+    let session = state
+        .as_ref()
+        .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
+    let entry = verrou_vault::get_entry(session.db.connection(), &session.master_key, &entry_id)
+        .map_err(|e| map_vault_error(&e))?;
+    let secret = match &entry.data {
+        verrou_vault::EntryData::Totp { secret } | verrou_vault::EntryData::Hotp { secret } => {
+            secret.clone()
+        }
+        _ => return Err("Entry is not a TOTP/HOTP entry.".to_string()),
+    };
+    Ok(OtpSecretDto { secret })
 }
 
 /// Update an existing entry.
@@ -3518,26 +3813,30 @@ mod tests {
     }
 
     #[test]
-    fn get_entry_totp_secret_still_returned() {
+    fn get_entry_totp_secret_is_empty() {
         let data = verrou_vault::EntryData::Totp {
             secret: "JBSWY3DPEHPK3PXP".into(),
         };
         let secret = get_entry_secret_for(&data);
-        assert_eq!(
-            secret, "JBSWY3DPEHPK3PXP",
-            "get_entry should still return TOTP secret (no re-auth gate for TOTP)"
+        assert!(
+            secret.is_empty(),
+            "get_entry must NOT return the TOTP secret under session-only auth; \
+             the display-safe code comes from generate_totp_code, and the raw \
+             secret only via reveal_otp_secret (re-auth required)"
         );
     }
 
     #[test]
-    fn get_entry_hotp_secret_still_returned() {
+    fn get_entry_hotp_secret_is_empty() {
         let data = verrou_vault::EntryData::Hotp {
             secret: "BASE32SECRET".into(),
         };
         let secret = get_entry_secret_for(&data);
-        assert_eq!(
-            secret, "BASE32SECRET",
-            "get_entry should still return HOTP secret"
+        assert!(
+            secret.is_empty(),
+            "get_entry must NOT return the HOTP secret under session-only auth; \
+             the display-safe code comes from generate_hotp_code, and the raw \
+             secret only via reveal_otp_secret (re-auth required)"
         );
     }
 

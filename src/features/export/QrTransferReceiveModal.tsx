@@ -225,30 +225,6 @@ export const QrTransferReceiveModal: Component<QrTransferReceiveModalProps> = (
     setPhase("scanning");
   }
 
-  function handleDoneScanning() {
-    const received = receivedChunks().size;
-    const total = totalChunks();
-
-    if (total > 0 && received >= total) {
-      stopCamera();
-      startImport();
-    } else if (total > 0) {
-      stopCamera();
-      setErrorMessage(
-        t("export.qrTransfer.receive.incompleteTransfer", { received: String(received), total: String(total) }),
-      );
-      setPhase("error");
-      setShake(true);
-      setTimeout(() => setShake(false), 200);
-    } else {
-      stopCamera();
-      setErrorMessage(t("export.qrTransfer.receive.noQrScanned"));
-      setPhase("error");
-      setShake(true);
-      setTimeout(() => setShake(false), 200);
-    }
-  }
-
   async function handleLoadFromFile() {
     if (!isValidCode(verificationCode())) return;
 
@@ -333,6 +309,7 @@ export const QrTransferReceiveModal: Component<QrTransferReceiveModalProps> = (
       {/* Phase: Verification code entry */}
       <Show when={phase() === "code"}>
         <form onSubmit={handleCodeSubmit} class={styles.codeForm}>
+          <p class={styles.crossDevice}>{t("export.qrTransfer.receive.crossDeviceHint")}</p>
           <p class={styles.description}>
             {t("export.qrTransfer.receive.codeDescription")}
           </p>
@@ -372,9 +349,10 @@ export const QrTransferReceiveModal: Component<QrTransferReceiveModalProps> = (
         </form>
       </Show>
 
-      {/* Phase: Camera scanning */}
+      {/* Phase: Camera scanning — auto-completes when all codes are captured */}
       <Show when={phase() === "scanning"}>
-        <div class={styles.scanningContent}>
+        <div class={styles.scanningContent} data-testid="qr-receive-scanning">
+          <p class={styles.scanHint}>{t("export.qrTransfer.receive.scanHint")}</p>
           <div class={styles.videoWrapper}>
             <video ref={videoRef} class={styles.video} playsinline muted aria-label={t("export.qrTransfer.receive.ariaCameraFeed")} />
             <div class={styles.scanOverlay}>
@@ -410,14 +388,8 @@ export const QrTransferReceiveModal: Component<QrTransferReceiveModalProps> = (
           </Show>
 
           <div class={styles.actions}>
-            <Button variant="ghost" onClick={handleClose}>
+            <Button variant="ghost" onClick={handleClose} data-testid="qr-receive-scan-cancel">
               {t("common.cancel")}
-            </Button>
-            <Button
-              onClick={handleDoneScanning}
-              data-testid="qr-receive-done-scanning"
-            >
-              {t("export.qrTransfer.receive.doneScanning")}
             </Button>
           </div>
         </div>

@@ -32,7 +32,7 @@
 }
 
 .modeBtn:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--border-color-strong);
   color: var(--color-text-primary);
 }
 

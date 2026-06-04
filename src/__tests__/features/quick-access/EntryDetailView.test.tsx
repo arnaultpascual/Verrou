@@ -265,20 +265,52 @@ describe("EntryDetailView — HotpDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     focusChangedCallback = undefined;
-    vi.spyOn(ipc, "generateTotpCode").mockResolvedValue({
+    // HOTP is counter-based: generateHotpCode returns the code generated from the
+    // current counter (here 5) and advances the stored counter to 6.
+    vi.spyOn(ipc, "generateHotpCode").mockResolvedValue({
       code: "987654",
-      remainingSeconds: 0,
+      counter: 5,
     });
     vi.spyOn(ipc, "copyToClipboard").mockResolvedValue(undefined);
   });
 
-  it("displays the HOTP code fetched on mount", async () => {
+  /** Click the "Generate & copy next code" button. */
+  const clickGenerate = (container: HTMLElement) => {
+    const btn = container.querySelector("button[class*='totpCopyBtn']") as HTMLButtonElement | null;
+    expect(btn).not.toBeNull();
+    fireEvent.click(btn!);
+  };
+
+  it("does not auto-generate on mount (counter-based — code shown only on request)", async () => {
+    const { container } = render(() => (
+      <EntryDetailView entry={HOTP_ENTRY} onBack={vi.fn()} />
+    ));
+
+    // Button is present, but no code yet and no counter burned.
+    await waitFor(() => {
+      expect(container.querySelector("button[class*='totpCopyBtn']")).not.toBeNull();
+    });
+    expect(container.textContent).not.toContain("987");
+    expect(ipc.generateHotpCode).not.toHaveBeenCalled();
+  });
+
+  it("generates the next code and copies it on click", async () => {
     const { container } = render(() => (
       <EntryDetailView entry={HOTP_ENTRY} onBack={vi.fn()} />
     ));
 
     await waitFor(() => {
+      expect(container.querySelector("button[class*='totpCopyBtn']")).not.toBeNull();
+    });
+
+    clickGenerate(container);
+
+    await waitFor(() => {
+      expect(ipc.generateHotpCode).toHaveBeenCalledWith("hotp-1");
+      expect(ipc.copyToClipboard).toHaveBeenCalledWith("987654");
+      // Code is shown (grouped) and the advanced counter (5 → 6) is reflected.
       expect(container.textContent).toContain("987");
+      expect(container.textContent).toContain("6");
     });
   });
 
@@ -286,6 +318,11 @@ describe("EntryDetailView — HotpDetail", () => {
     const { container } = render(() => (
       <EntryDetailView entry={HOTP_ENTRY} onBack={vi.fn()} />
     ));
+
+    await waitFor(() => {
+      expect(container.querySelector("button[class*='totpCopyBtn']")).not.toBeNull();
+    });
+    clickGenerate(container);
 
     // Wait for code to appear
     await waitFor(() => {
@@ -295,22 +332,24 @@ describe("EntryDetailView — HotpDetail", () => {
     // Simulate window blur
     simulateFocusLoss();
 
-    // Code must be cleared (empty string renders as nothing meaningful)
+    // Code must be cleared
     await waitFor(() => {
       expect(container.textContent).not.toContain("987654");
     });
   });
 
   it("clears the HOTP code on cleanup (component unmount)", async () => {
-    let codeInDom = false;
-
     const { container, unmount } = render(() => (
       <EntryDetailView entry={HOTP_ENTRY} onBack={vi.fn()} />
     ));
 
     await waitFor(() => {
-      codeInDom = container.textContent?.includes("987") ?? false;
-      expect(codeInDom).toBe(true);
+      expect(container.querySelector("button[class*='totpCopyBtn']")).not.toBeNull();
+    });
+    clickGenerate(container);
+
+    await waitFor(() => {
+      expect(container.textContent?.includes("987")).toBe(true);
     });
 
     unmount();

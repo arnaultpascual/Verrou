@@ -52,11 +52,12 @@ fn folder_to_dto(f: &verrou_vault::Folder) -> FolderDto {
 // Commands
 // ---------------------------------------------------------------------------
 
-/// Create a new folder.
+/// Create a new folder, optionally nested under `parent_id`.
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 pub fn create_folder(
     name: String,
+    parent_id: Option<String>,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<FolderDto, String> {
     let trimmed = name.trim();
@@ -74,8 +75,37 @@ pub fn create_folder(
         .as_ref()
         .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
 
-    let folder = verrou_vault::create_folder(session.db.connection(), trimmed)
-        .map_err(|e| format!("Failed to create folder: {e}"))?;
+    let folder =
+        verrou_vault::create_folder_under(session.db.connection(), trimmed, parent_id.as_deref())
+            .map_err(|e| format!("Failed to create folder: {e}"))?;
+
+    Ok(folder_to_dto(&folder))
+}
+
+/// Move a folder under a new parent (or to the top level when `newParentId` is
+/// omitted) and place it at `position` among its new siblings.
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+pub fn move_folder(
+    folder_id: String,
+    new_parent_id: Option<String>,
+    position: i32,
+    vault_state: State<'_, ManagedVaultState>,
+) -> Result<FolderDto, String> {
+    let state = vault_state
+        .lock()
+        .map_err(|_| "Internal error: failed to acquire vault lock".to_string())?;
+    let session = state
+        .as_ref()
+        .ok_or_else(|| "Vault is locked. Please unlock first.".to_string())?;
+
+    let folder = verrou_vault::move_folder(
+        session.db.connection(),
+        &folder_id,
+        new_parent_id.as_deref(),
+        position,
+    )
+    .map_err(|e| format!("Failed to move folder: {e}"))?;
 
     Ok(folder_to_dto(&folder))
 }

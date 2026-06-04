@@ -1,6 +1,7 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
 import { PopupApp } from "./features/quick-access/PopupApp";
+import "./styles/fonts.css";
 import "./styles/variables.css";
 import "./styles/reset.css";
 import "./styles/global.css";

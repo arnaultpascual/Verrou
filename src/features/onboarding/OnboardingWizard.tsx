@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
-import { createSignal, Switch, Match } from "solid-js";
+import { createSignal, Show, Switch, Match } from "solid-js";
 import { StepIndicator } from "./StepIndicator";
+import { WelcomeStep } from "./WelcomeStep";
 import { PasswordStep } from "./PasswordStep";
 import { KdfPresetStep } from "./KdfPresetStep";
 import { RecoveryKeyStep } from "./RecoveryKeyStep";
@@ -10,10 +11,11 @@ import { Button } from "../../components";
 import { t } from "../../stores/i18nStore";
 import styles from "./OnboardingWizard.module.css";
 
+// Step 0 is the welcome gateway; steps 1-4 are the numbered wizard.
 const TOTAL_STEPS = 4;
 
 export const OnboardingWizard: Component = () => {
-  const [step, setStep] = createSignal(1);
+  const [step, setStep] = createSignal(0);
   const [canProceed, setCanProceed] = createSignal(false);
 
   const next = () => {
@@ -33,9 +35,22 @@ export const OnboardingWizard: Component = () => {
   return (
     <div class={styles.backdrop}>
       <div class={styles.card}>
-        <StepIndicator currentStep={step()} labels={[t("onboarding.steps.password"), t("onboarding.steps.security"), t("onboarding.steps.recovery"), t("onboarding.steps.import")]} />
+        <Show when={step() >= 1}>
+          <StepIndicator
+            currentStep={step()}
+            labels={[
+              t("onboarding.steps.password"),
+              t("onboarding.steps.security"),
+              t("onboarding.steps.recovery"),
+              t("onboarding.steps.import"),
+            ]}
+          />
+        </Show>
 
         <Switch>
+          <Match when={step() === 0}>
+            <WelcomeStep onStart={() => setStep(1)} />
+          </Match>
           <Match when={step() === 1}>
             <PasswordStep onValidChange={setCanProceed} />
           </Match>
@@ -50,18 +65,14 @@ export const OnboardingWizard: Component = () => {
           </Match>
         </Switch>
 
-        {step() < TOTAL_STEPS && !wizardStore.isCreating && (
+        {step() >= 1 && step() < TOTAL_STEPS && !wizardStore.isCreating && (
           <div class={styles.navigation}>
             {step() > 1 && (
               <Button variant="ghost" onClick={back}>
                 {t("common.back")}
               </Button>
             )}
-            <Button
-              variant="primary"
-              onClick={next}
-              disabled={!canProceed()}
-            >
+            <Button variant="primary" onClick={next} disabled={!canProceed()}>
               {t("common.next")}
             </Button>
           </div>

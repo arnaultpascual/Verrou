@@ -3,9 +3,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-lg);
   font-family: var(--font-family);
-  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-tight);
   border-radius: var(--border-radius-md);
@@ -18,6 +16,36 @@
   user-select: none;
 }
 
+/* ── Sizes (height, padding, font-size via tokens) ── */
+.sm {
+  min-height: 34px;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-xs);
+}
+
+.md {
+  min-height: 40px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-sm);
+}
+
+.lg {
+  min-height: 46px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-size-md);
+}
+
+/* ── Modifiers ── */
+.iconOnly {
+  padding-left: 0;
+  padding-right: 0;
+  aspect-ratio: 1 / 1;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
 /* ── Primary ── */
 .primary {
   background-color: var(--color-primary);
@@ -28,6 +56,18 @@
 .primary:hover:not([aria-disabled="true"]) {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
+}
+
+/* ── Secondary (outline) ── */
+.secondary {
+  background-color: transparent;
+  color: var(--color-text-primary);
+  border-color: var(--border-color-strong);
+}
+
+.secondary:hover:not([aria-disabled="true"]) {
+  background-color: var(--color-surface-3);
+  border-color: var(--border-color-strong);
 }
 
 /* ── Ghost ── */
@@ -50,7 +90,8 @@
 }
 
 .danger:hover:not([aria-disabled="true"]) {
-  filter: brightness(1.1);
+  background-color: color-mix(in srgb, var(--color-danger) 88%, #fff);
+  border-color: color-mix(in srgb, var(--color-danger) 88%, #fff);
 }
 
 /* ── Disabled ── */
@@ -58,7 +99,7 @@
   color: var(--color-text-muted);
   cursor: not-allowed;
   pointer-events: none;
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
 /* ── Focus ── */

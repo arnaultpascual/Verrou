@@ -106,4 +106,74 @@ describe("Input", () => {
     const input = container.querySelector("input")!;
     expect(input.className).toContain("inputError");
   });
+
+  describe("hint", () => {
+    it("renders hint text under the field", () => {
+      const { getByText } = render(() => (
+        <Input label="Email" hint="We never share this" />
+      ));
+      expect(getByText("We never share this")).toBeTruthy();
+    });
+
+    it("links hint to input via aria-describedby", () => {
+      const { container } = render(() => (
+        <Input label="Email" id="email" hint="Helper" />
+      ));
+      const input = container.querySelector("input")!;
+      const hintEl = container.querySelector("#email-hint")!;
+      expect(hintEl).toBeTruthy();
+      expect(hintEl.textContent).toBe("Helper");
+      expect(input.getAttribute("aria-describedby")).toBe(hintEl.id);
+    });
+
+    it("does not render hint when not provided", () => {
+      const { container } = render(() => <Input label="Email" id="email" />);
+      expect(container.querySelector("#email-hint")).toBeNull();
+      const input = container.querySelector("input")!;
+      expect(input.getAttribute("aria-describedby")).toBeNull();
+    });
+
+    it("describes input by both hint and error when both present", () => {
+      const { container } = render(() => (
+        <Input label="Email" id="email" hint="Helper" error="Required" />
+      ));
+      const input = container.querySelector("input")!;
+      const describedBy = input.getAttribute("aria-describedby")!;
+      expect(describedBy).toContain("email-error");
+      expect(describedBy).toContain("email-hint");
+    });
+  });
+
+  describe("required", () => {
+    it("shows a required indicator on the label", () => {
+      const { container } = render(() => (
+        <Input label="Name" required />
+      ));
+      const label = container.querySelector("label")!;
+      expect(label.textContent).toContain("*");
+    });
+
+    it("sets the native required attribute on the input", () => {
+      const { container } = render(() => (
+        <Input label="Name" required />
+      ));
+      const input = container.querySelector("input")!;
+      expect(input.required).toBe(true);
+    });
+
+    it("required indicator is hidden from assistive tech", () => {
+      const { container } = render(() => (
+        <Input label="Name" required />
+      ));
+      const indicator = container.querySelector("label span")!;
+      expect(indicator.getAttribute("aria-hidden")).toBe("true");
+    });
+
+    it("is not required by default", () => {
+      const { container } = render(() => <Input label="Name" />);
+      const input = container.querySelector("input")!;
+      expect(input.required).toBe(false);
+      expect(container.querySelector("label span")).toBeNull();
+    });
+  });
 });

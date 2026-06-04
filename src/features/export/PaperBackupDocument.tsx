@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import { For, Show } from "solid-js";
+import { t } from "../../stores/i18nStore";
 import type { PaperBackupData } from "./paperBackupIpc";
 import styles from "./PaperBackupDocument.module.css";
 
@@ -17,25 +18,25 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
     <div class={styles.document} data-testid="paper-backup-document">
       {/* Header */}
       <div class={styles.header}>
-        <p class={styles.confidential}>CONFIDENTIAL</p>
-        <h2 class={styles.title}>VERROU Paper Backup</h2>
+        <p class={styles.confidential}>{t("export.paperBackup.doc.confidential")}</p>
+        <h2 class={styles.title}>{t("export.paperBackup.doc.title")}</h2>
         <p class={styles.meta}>
-          Generated: {props.data.generatedAt}
+          {t("export.paperBackup.doc.generated", { date: props.data.generatedAt })}
           <br />
-          Vault Fingerprint: {props.data.vaultFingerprint}
+          {t("export.paperBackup.doc.fingerprint", {
+            fingerprint: props.data.vaultFingerprint,
+          })}
         </p>
       </div>
 
       <Show when={!hasSeeds() && !hasRecovery()}>
-        <p class={styles.emptyState}>
-          No seed phrases or recovery codes found in this vault.
-        </p>
+        <p class={styles.emptyState}>{t("export.paperBackup.doc.empty")}</p>
       </Show>
 
       {/* Seed Phrases Section */}
       <Show when={hasSeeds()}>
         <div class={styles.section} data-testid="seeds-section">
-          <h3 class={styles.sectionTitle}>Seed Phrases</h3>
+          <h3 class={styles.sectionTitle}>{t("export.paperBackup.doc.seedsTitle")}</h3>
           <For each={props.data.seeds}>
             {(seed) => {
               return (
@@ -43,10 +44,7 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
                   <p class={styles.entryName}>
                     {seed.name}
                     <Show when={seed.issuer}>
-                      <span class={styles.entryIssuer}>
-                        {" "}
-                        ({seed.issuer})
-                      </span>
+                      <span class={styles.entryIssuer}> ({seed.issuer})</span>
                     </Show>
                   </p>
                   <div class={styles.wordGrid}>
@@ -61,8 +59,7 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
                   </div>
                   <Show when={seed.hasPassphrase}>
                     <p class={styles.passphraseWarning}>
-                      Passphrase protected (25th word not included in this
-                      backup)
+                      {t("export.paperBackup.doc.passphraseNote")}
                     </p>
                   </Show>
                 </div>
@@ -75,17 +72,14 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
       {/* Recovery Codes Section */}
       <Show when={hasRecovery()}>
         <div class={styles.section} data-testid="recovery-section">
-          <h3 class={styles.sectionTitle}>Recovery Codes</h3>
+          <h3 class={styles.sectionTitle}>{t("export.paperBackup.doc.recoveryTitle")}</h3>
           <For each={props.data.recoveryCodes}>
             {(entry) => (
               <div class={styles.entryBlock}>
                 <p class={styles.entryName}>
                   {entry.name}
                   <Show when={entry.issuer}>
-                    <span class={styles.entryIssuer}>
-                      {" "}
-                      ({entry.issuer})
-                    </span>
+                    <span class={styles.entryIssuer}> ({entry.issuer})</span>
                   </Show>
                 </p>
                 <div class={styles.codeGrid}>
@@ -97,7 +91,7 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
                           class={`${styles.codeItem} ${isUsed() ? styles.codeUsed : ""}`}
                         >
                           <span class={styles.statusIcon}>
-                            {isUsed() ? "\u2717" : "\u2713"}
+                            {isUsed() ? "✗" : "✓"}
                           </span>
                           <span>{code}</span>
                         </div>
@@ -106,7 +100,10 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
                   </For>
                 </div>
                 <p class={styles.remainingNote}>
-                  {entry.remainingCodes} of {entry.totalCodes} remaining
+                  {t("export.paperBackup.doc.remaining", {
+                    remaining: String(entry.remainingCodes),
+                    total: String(entry.totalCodes),
+                  })}
                 </p>
               </div>
             )}
@@ -117,13 +114,12 @@ export const PaperBackupDocument: Component<PaperBackupDocumentProps> = (
       {/* Footer */}
       <div class={styles.footer}>
         <p class={styles.checksum}>
-          <span class={styles.checksumLabel}>Content Checksum (BLAKE3): </span>
+          <span class={styles.checksumLabel}>
+            {t("export.paperBackup.doc.checksumLabel")}
+          </span>
           {props.data.contentChecksum}
         </p>
-        <p class={styles.footerWarning}>
-          Store this document in a secure physical location. Do NOT photograph
-          or digitize this backup.
-        </p>
+        <p class={styles.footerWarning}>{t("export.paperBackup.doc.storeWarning")}</p>
       </div>
     </div>
   );

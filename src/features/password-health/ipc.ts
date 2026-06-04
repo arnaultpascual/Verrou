@@ -62,8 +62,11 @@ export async function getPasswordHealth(): Promise<PasswordHealthReport> {
 // Mock data (realistic for 5 credential entries)
 // ---------------------------------------------------------------------------
 
+// Score reflects password hygiene only (reused 2 + weak 1 + old 2 = 5 issues
+// across 5 credentials × 3 checks = 15 → 100 − 33 = 67). Missing 2FA is tracked
+// separately and excluded from the score.
 const MOCK_REPORT: PasswordHealthReport = {
-  overallScore: 65,
+  overallScore: 67,
   totalCredentials: 5,
   reusedCount: 2,
   reusedGroups: [

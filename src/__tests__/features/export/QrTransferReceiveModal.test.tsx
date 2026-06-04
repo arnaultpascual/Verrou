@@ -204,13 +204,13 @@ describe("QrTransferReceiveModal", () => {
 
       await waitFor(() => {
         expect(
-          document.querySelector("[data-testid='qr-receive-done-scanning']"),
+          document.querySelector("[data-testid='qr-receive-scanning']"),
         ).toBeTruthy();
         expect(document.body.textContent).toContain("Scanning for QR codes");
       });
     });
 
-    it("shows error when Done Scanning pressed with no chunks", async () => {
+    it("does not offer a 'Done Scanning' trap (transfer auto-completes)", async () => {
       const mockStream = {
         getTracks: () => [{ stop: vi.fn() }],
       };
@@ -228,30 +228,25 @@ describe("QrTransferReceiveModal", () => {
 
       await waitFor(() => {
         expect(
-          document.querySelector("[data-testid='qr-receive-done-scanning']"),
+          document.querySelector("[data-testid='qr-receive-scanning']"),
         ).toBeTruthy();
       });
 
-      fireEvent.click(
-        document.querySelector("[data-testid='qr-receive-done-scanning']")!,
-      );
-
-      await waitFor(() => {
-        const error = document.querySelector(
-          "[data-testid='qr-receive-error']",
-        );
-        expect(error).toBeTruthy();
-        expect(error!.textContent).toContain("No QR codes were scanned");
-      });
+      // The misleading "Done Scanning" button (which could only ever error,
+      // since a complete transfer auto-imports) is gone — only Cancel remains.
+      expect(
+        document.querySelector("[data-testid='qr-receive-done-scanning']"),
+      ).toBeNull();
+      expect(
+        document.querySelector("[data-testid='qr-receive-scan-cancel']"),
+      ).toBeTruthy();
     });
   });
 
   describe("error phase", () => {
-    it("returns to code phase on retry", async () => {
-      const mockStream = {
-        getTracks: () => [{ stop: vi.fn() }],
-      };
-      mockGetUserMedia.mockResolvedValueOnce(mockStream);
+    it("returns to the code phase on retry (from camera-denied)", async () => {
+      // A rejected getUserMedia drives the camera-denied phase, which offers retry.
+      mockGetUserMedia.mockRejectedValueOnce(new Error("denied"));
 
       renderModal();
 
@@ -265,22 +260,12 @@ describe("QrTransferReceiveModal", () => {
 
       await waitFor(() => {
         expect(
-          document.querySelector("[data-testid='qr-receive-done-scanning']"),
+          document.querySelector("[data-testid='qr-receive-retry-camera']"),
         ).toBeTruthy();
       });
 
       fireEvent.click(
-        document.querySelector("[data-testid='qr-receive-done-scanning']")!,
-      );
-
-      await waitFor(() => {
-        expect(
-          document.querySelector("[data-testid='qr-receive-retry']"),
-        ).toBeTruthy();
-      });
-
-      fireEvent.click(
-        document.querySelector("[data-testid='qr-receive-retry']")!,
+        document.querySelector("[data-testid='qr-receive-retry-camera']")!,
       );
 
       await waitFor(() => {
@@ -334,7 +319,7 @@ describe("QrTransferReceiveModal", () => {
 
       await waitFor(() => {
         expect(
-          document.querySelector("[data-testid='qr-receive-done-scanning']"),
+          document.querySelector("[data-testid='qr-receive-scanning']"),
         ).toBeTruthy();
       });
 

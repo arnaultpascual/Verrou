@@ -353,7 +353,9 @@ describe("CredentialDetailModal", () => {
 
       await waitFor(() => {
         expect(mockCopyToClipboard).toHaveBeenCalledWith("123456");
-        expect(mockToast.success).toHaveBeenCalledWith("TOTP code copied");
+        // Unified reveal-copy grammar: "{label} copied · clears in {n}s"
+        // (label = "Linked TOTP", clipboard auto-clear default = 30s).
+        expect(mockToast.success).toHaveBeenCalledWith("Linked TOTP copied · clears in 30s");
       });
     });
 
@@ -384,6 +386,60 @@ describe("CredentialDetailModal", () => {
 
       const totpEl = document.querySelector("[data-testid='credential-totp-code']");
       expect(totpEl).toBeNull();
+    });
+  });
+
+  describe("unified reveal-copy grammar (after reveal)", () => {
+    /** Helper: performs the re-auth reveal flow and waits for revealed data. */
+    async function performReveal() {
+      const revealBtn = document.querySelector("[data-testid='credential-reveal-btn']");
+      fireEvent.click(revealBtn!);
+
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("Verify Your Identity");
+      });
+
+      const passwordInput = document.querySelector("input[type='password']") as HTMLInputElement;
+      fireEvent.input(passwordInput, { target: { value: "master-pass" } });
+      const form = document.querySelector("form");
+      fireEvent.submit(form!);
+
+      await waitFor(
+        () => {
+          expect(document.querySelector("[data-testid='credential-password-revealed']")).toBeTruthy();
+        },
+        { timeout: 5000 },
+      );
+    }
+
+    it("copies the password via the concealed clipboard with the unified toast", async () => {
+      render(() => <CredentialDetailModal {...defaultProps} />);
+      await performReveal();
+
+      const copyBtn = document.querySelector(
+        "[data-testid='credential-copy-password-btn']",
+      ) as HTMLElement;
+      fireEvent.click(copyBtn);
+
+      await waitFor(() => {
+        expect(mockCopyToClipboard).toHaveBeenCalledWith("s3cret-p@ss!");
+        expect(mockToast.success).toHaveBeenCalledWith("Password copied · clears in 30s");
+      });
+    });
+
+    it("copies the username via the concealed clipboard with the unified toast", async () => {
+      render(() => <CredentialDetailModal {...defaultProps} />);
+      await performReveal();
+
+      const copyBtn = document.querySelector(
+        "[data-testid='credential-copy-username-btn']",
+      ) as HTMLElement;
+      fireEvent.click(copyBtn);
+
+      await waitFor(() => {
+        expect(mockCopyToClipboard).toHaveBeenCalledWith("user@example.com");
+        expect(mockToast.success).toHaveBeenCalledWith("Username copied · clears in 30s");
+      });
     });
   });
 

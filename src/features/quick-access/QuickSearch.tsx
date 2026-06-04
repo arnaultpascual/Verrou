@@ -1,20 +1,39 @@
 import type { Component } from "solid-js";
 import { createSignal, onMount, For, Show } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listEntries, updateEntry } from "../entries/ipc";
+import { listEntries, updateEntry, generateTotpCode, generateHotpCode, copyToClipboard } from "../entries/ipc";
 import { filterEntries } from "../entries/filterEntries";
 import type { EntryMetadataDto } from "../entries/ipc";
 import { PopupResultItem } from "./PopupResultItem";
 import { EntryDetailView } from "./EntryDetailView";
 import { useToast } from "../../components/useToast";
+import { clipboardAutoClearMs } from "../../stores/preferencesStore";
 import { Icon } from "../../components/Icon";
 import { t } from "../../stores/i18nStore";
 import styles from "./QuickSearch.module.css";
 
+/** Codes with fewer than this many seconds left are refreshed before copy. */
+const STALE_THRESHOLD_S = 2;
+
+/**
+ * Whether activating this entry copies a value directly (the hero flow) or
+ * opens the detail view. TOTP/HOTP copy the live code; credentials with a
+ * plaintext username copy that username. Everything else (and credentials
+ * whose only secret is the password) opens the detail view, where the
+ * re-auth reveal flow lives — secrets are never copied straight from the list.
+ */
+function copiesDirectly(entry: EntryMetadataDto): boolean {
+  if (entry.entryType === "totp" || entry.entryType === "hotp") return true;
+  if (entry.entryType === "credential" && entry.username) return true;
+  return false;
+}
+
 /**
  * Quick search interface for the popup window.
- * Auto-focuses search input, filters entries in real-time,
- * supports keyboard navigation and detail view per entry.
+ * Auto-focuses search input, filters entries in real-time, and supports
+ * keyboard navigation. The primary action (Enter or click) copies the result's
+ * primary value directly for copyable types (TOTP/HOTP code, credential
+ * username); other types open a detail view. Esc hides the popup.
  */
 export const QuickSearch: Component = () => {
   const [query, setQuery] = createSignal("");
@@ -37,11 +56,84 @@ export const QuickSearch: Component = () => {
     inputRef?.focus();
   });
 
-  const openSelectedEntry = () => {
+  /**
+   * Copy an OTP code to the (concealed, auto-clearing) clipboard and hide the
+   * popup.
+   *
+   * TOTP is time-based: refresh the code first if it is about to roll over so
+   * the user never copies a stale value. HOTP is counter-based: generate the
+   * *next* code (which advances + persists the counter) — there is no rollover.
+   */
+  const copyTotpCode = async (entry: EntryMetadataDto) => {
+    try {
+      let code: string;
+      if (entry.entryType === "hotp") {
+        const result = await generateHotpCode(entry.id);
+        code = result.code;
+      } else {
+        let result = await generateTotpCode(entry.id);
+        if (result.remainingSeconds < STALE_THRESHOLD_S) {
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, result.remainingSeconds * 1000),
+          );
+          result = await generateTotpCode(entry.id);
+        }
+        code = result.code;
+      }
+      await copyToClipboard(code);
+      const seconds = Math.round(clipboardAutoClearMs() / 1000);
+      toast.success(
+        t("quickAccess.copyCodeCleared", { name: entry.name, seconds: String(seconds) }),
+      );
+      await getCurrentWindow().hide();
+    } catch {
+      toast.error(t("quickAccess.copyCodeError"));
+    }
+  };
+
+  /**
+   * Copy a credential's plaintext username (display-safe — never the password)
+   * to the concealed clipboard and hide the popup. Passwords still require the
+   * re-auth reveal flow inside the detail view; this path never bypasses it.
+   */
+  const copyCredentialUsername = async (entry: EntryMetadataDto) => {
+    if (!entry.username) return;
+    try {
+      await copyToClipboard(entry.username);
+      const seconds = Math.round(clipboardAutoClearMs() / 1000);
+      toast.success(
+        t("quickAccess.copyUsernameCleared", { name: entry.name, seconds: String(seconds) }),
+      );
+      await getCurrentWindow().hide();
+    } catch {
+      toast.error(t("quickAccess.copyUsernameError"));
+    }
+  };
+
+  /**
+   * Primary action for a result (Enter or click). Copyable results copy their
+   * primary value directly; everything else opens the detail view (which holds
+   * the re-auth reveal flow and per-type guidance).
+   */
+  const activateEntry = (entry: EntryMetadataDto) => {
+    if (!copiesDirectly(entry)) {
+      // Secrets that require reveal/re-auth (credential password, seed phrase,
+      // recovery code, secure note) open the detail view — never copied here.
+      setSelectedEntry(entry);
+      return;
+    }
+    if (entry.entryType === "credential") {
+      void copyCredentialUsername(entry);
+    } else {
+      void copyTotpCode(entry);
+    }
+  };
+
+  const activateSelected = () => {
     const items = filtered();
     const idx = selectedIndex();
     if (idx < 0 || idx >= items.length) return;
-    setSelectedEntry(items[idx]);
+    activateEntry(items[idx]);
   };
 
   const handleBack = () => {
@@ -69,7 +161,7 @@ export const QuickSearch: Component = () => {
 
       case "Enter":
         e.preventDefault();
-        openSelectedEntry();
+        activateSelected();
         break;
 
       case "Escape":
@@ -144,7 +236,7 @@ export const QuickSearch: Component = () => {
                   index={index()}
                   onSelect={() => {
                     setSelectedIndex(index());
-                    setSelectedEntry(entry);
+                    activateEntry(entry);
                   }}
                   onTogglePin={handleTogglePin}
                 />
@@ -159,9 +251,9 @@ export const QuickSearch: Component = () => {
           </div>
 
           <div class={styles.hints}>
-            <span>&#8593;&#8595; {t("quickAccess.hintNavigate")}</span>
-            <span>&#9166; {t("quickAccess.detail.hintsOpen")}</span>
-            <span>esc {t("quickAccess.hintClose")}</span>
+            <span>{t("quickAccess.hintNavigate")}</span>
+            <span>{t("quickAccess.hintCopy")}</span>
+            <span>{t("quickAccess.hintClose")}</span>
           </div>
         </>
       }>

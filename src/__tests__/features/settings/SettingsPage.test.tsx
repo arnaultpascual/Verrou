@@ -20,6 +20,20 @@ vi.mock("../../../features/vault/ipc", () => ({
   }),
 }));
 
+// Mock the preferences store so the Security/Appearance groups render their
+// controls (they gate on preferencesLoaded()).
+const mockUpdatePreferences = vi.fn().mockResolvedValue(undefined);
+let mockClipboardMs = 30_000;
+vi.mock("../../../stores/preferencesStore", () => ({
+  preferencesLoaded: () => true,
+  currentTheme: () => "system",
+  autoLockTimeoutMinutes: () => 15,
+  clipboardAutoClearMs: () => mockClipboardMs,
+  launchOnBoot: () => false,
+  startMinimized: () => false,
+  updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
+}));
+
 // Mock useToast
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -50,6 +64,7 @@ function renderSettingsPage() {
 describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClipboardMs = 30_000;
   });
 
   afterEach(() => {
@@ -63,6 +78,46 @@ describe("SettingsPage", () => {
     expect(getByText("Settings")).toBeDefined();
     expect(getByText("Security")).toBeDefined();
     expect(getByTestId("change-password-start")).toBeDefined();
+  });
+
+  // -- Grouping: the four section groups are present --
+
+  it("groups settings under Security / Appearance / Backup & Transfer / About headings", async () => {
+    const { getByTestId, getByText, findByText, container } = renderSettingsPage();
+    expect(getByTestId("group-security")).toBeDefined();
+    expect(container.querySelector('[data-group="appearance"]')).not.toBeNull();
+    expect(getByTestId("group-backup-transfer")).toBeDefined();
+    // Group headings render their labels (each appears exactly once).
+    expect(getByText("Security")).toBeDefined();
+    expect(getByText("Appearance")).toBeDefined();
+    expect(getByText("Backup & Transfer")).toBeDefined();
+    // About group heading comes from the AboutSection ("About VERROU"),
+    // which renders after its async app-info load resolves.
+    expect(await findByText("About VERROU")).toBeDefined();
+  });
+
+  // -- The clipboard auto-clear control is reachable inside the Security group --
+
+  it("exposes the clipboard auto-clear control inside the Security group", () => {
+    const { getByTestId } = renderSettingsPage();
+    const security = getByTestId("group-security");
+    const select = getByTestId("clipboard-clear-select") as HTMLSelectElement;
+    expect(select).toBeDefined();
+    // It lives within the Security group, not a separate scroll section.
+    expect(security.contains(select)).toBe(true);
+  });
+
+  it("clipboard control reads the stored preference and writes on change", () => {
+    mockClipboardMs = 60_000;
+    const { getByTestId } = renderSettingsPage();
+    const select = getByTestId("clipboard-clear-select") as HTMLSelectElement;
+    // Reads current preference…
+    expect(select.value).toBe("60000");
+    // …and writes the new value through the store on change.
+    fireEvent.change(select, { target: { value: "10000" } });
+    expect(mockUpdatePreferences).toHaveBeenCalledWith({
+      clipboardAutoClearMs: 10_000,
+    });
   });
 
   // -- Task 5.8: clicking button shows current password input --

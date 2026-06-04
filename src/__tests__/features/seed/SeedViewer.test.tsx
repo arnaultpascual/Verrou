@@ -1,26 +1,7 @@
-import { render, fireEvent, waitFor } from "@solidjs/testing-library";
+import { render, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { SeedViewer } from "../../../features/seed/SeedViewer";
 import type { SeedDisplay } from "../../../features/seed/ipc";
-
-// Mock useToast
-const mockToast = {
-  success: vi.fn(),
-  error: vi.fn(),
-  info: vi.fn(),
-  dismiss: vi.fn(),
-  clear: vi.fn(),
-};
-
-vi.mock("../../../components/useToast", () => ({
-  useToast: () => mockToast,
-}));
-
-// Mock copyToClipboard
-const mockCopyToClipboard = vi.fn().mockResolvedValue(undefined);
-vi.mock("../../../features/entries/ipc", () => ({
-  copyToClipboard: (...args: unknown[]) => mockCopyToClipboard(...args),
-}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -40,14 +21,16 @@ const TEST_SEED: SeedDisplay = {
 };
 
 const TEST_SEED_WITH_PASSPHRASE: SeedDisplay = {
-  words: [
-    "abandon", "abandon", "abandon", "abandon", "abandon", "abandon",
-    "abandon", "abandon", "abandon", "abandon", "abandon", "about",
-  ],
-  wordCount: 12,
+  ...TEST_SEED,
   hasPassphrase: true,
 };
 
+/**
+ * SeedViewer is now purely presentational — the reveal lifecycle (countdown,
+ * clipboard, vault-lock clearing, cleanup) lives in the parent via `useReveal` /
+ * `useRevealCopy` / `AutoHideCountdown`. These tests cover only the rendering and
+ * the callback wiring.
+ */
 describe("SeedViewer", () => {
   describe("masked state", () => {
     it("renders masked grid with correct word count", () => {
@@ -57,14 +40,14 @@ describe("SeedViewer", () => {
           hasPassphrase={false}
           revealedData={null}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
       const grid = document.querySelector("[data-testid='seed-masked-grid']");
       expect(grid).toBeTruthy();
-      const maskedWords = grid!.children;
-      expect(maskedWords.length).toBe(12);
+      expect(grid!.children.length).toBe(12);
     });
 
     it("renders 24-word masked grid", () => {
@@ -74,7 +57,8 @@ describe("SeedViewer", () => {
           hasPassphrase={false}
           revealedData={null}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
@@ -82,50 +66,24 @@ describe("SeedViewer", () => {
       expect(grid!.children.length).toBe(24);
     });
 
-    it("shows masked dots for each word", () => {
+    it("shows masked dots for each word and no real words", () => {
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={null}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
-      expect(document.body.textContent).toContain("\u25CF\u25CF\u25CF\u25CF\u25CF");
+      expect(document.body.textContent).toContain("●●●●●");
+      expect(document.body.textContent).not.toContain("abandon");
+      expect(document.body.textContent).not.toContain("about");
     });
 
-    it("displays word numbers starting from 1", () => {
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={null}
-          onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
-        />
-      ));
-
-      expect(document.body.textContent).toContain("1");
-      expect(document.body.textContent).toContain("12");
-    });
-
-    it("shows Reveal button", () => {
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={null}
-          onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
-        />
-      ));
-
-      expect(document.body.textContent).toContain("Reveal");
-    });
-
-    it("calls onRevealRequest when Reveal button is clicked", () => {
+    it("shows Reveal button and fires onRevealRequest", () => {
       const onRevealRequest = vi.fn();
       render(() => (
         <SeedViewer
@@ -133,77 +91,67 @@ describe("SeedViewer", () => {
           hasPassphrase={false}
           revealedData={null}
           onRevealRequest={onRevealRequest}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
       const revealBtn = document.querySelector("[data-testid='reveal-btn']");
+      expect(revealBtn).toBeTruthy();
       fireEvent.click(revealBtn!);
       expect(onRevealRequest).toHaveBeenCalledTimes(1);
     });
 
-    it("does not show countdown timer in masked state", () => {
+    it("does not render the injected countdown while masked", () => {
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={null}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
+          countdown={<div data-testid="injected-countdown">timer</div>}
         />
       ));
 
-      const timer = document.querySelector("[data-testid='countdown-timer']");
-      expect(timer).toBeNull();
+      expect(document.querySelector("[data-testid='injected-countdown']")).toBeNull();
     });
   });
 
   describe("revealed state", () => {
-    it("shows revealed word grid", () => {
+    it("shows revealed word grid with all words", () => {
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
       const grid = document.querySelector("[data-testid='seed-revealed-grid']");
       expect(grid).toBeTruthy();
+      expect(grid!.textContent).toContain("abandon");
+      expect(grid!.textContent).toContain("about");
     });
 
-    it("displays all 12 words", () => {
+    it("renders the injected countdown slot while revealed", () => {
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
+          countdown={<div data-testid="injected-countdown">timer</div>}
         />
       ));
 
-      expect(document.body.textContent).toContain("abandon");
-      expect(document.body.textContent).toContain("about");
-    });
-
-    it("shows countdown timer", () => {
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={TEST_SEED}
-          onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
-        />
-      ));
-
-      const timer = document.querySelector("[data-testid='countdown-timer']");
-      expect(timer).toBeTruthy();
-      expect(timer!.textContent).toContain("Hiding in");
-      expect(timer!.textContent).toContain("60s");
+      expect(document.querySelector("[data-testid='injected-countdown']")).toBeTruthy();
     });
 
     it("shows Copy All and Hide buttons", () => {
@@ -213,7 +161,8 @@ describe("SeedViewer", () => {
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
@@ -228,158 +177,73 @@ describe("SeedViewer", () => {
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
 
-      const revealBtn = document.querySelector("[data-testid='reveal-btn']");
-      expect(revealBtn).toBeNull();
+      expect(document.querySelector("[data-testid='reveal-btn']")).toBeNull();
     });
 
-    it("calls onClear when Hide button is clicked", () => {
-      const onClear = vi.fn();
+    it("fires onCopyAll when Copy All is clicked", () => {
+      const onCopyAll = vi.fn();
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={onClear}
+          onCopyAll={onCopyAll}
+          onHide={vi.fn()}
         />
       ));
 
-      const hideBtn = document.querySelector("[data-testid='hide-btn']");
-      fireEvent.click(hideBtn!);
-      expect(onClear).toHaveBeenCalledTimes(1);
+      fireEvent.click(document.querySelector("[data-testid='copy-all-btn']")!);
+      expect(onCopyAll).toHaveBeenCalledTimes(1);
     });
 
-    it("copies seed phrase to clipboard on Copy All click", async () => {
+    it("fires onHide when Hide is clicked", () => {
+      const onHide = vi.fn();
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={onHide}
         />
       ));
 
-      const copyBtn = document.querySelector("[data-testid='copy-all-btn']");
-      fireEvent.click(copyBtn!);
-
-      await waitFor(() => {
-        expect(mockCopyToClipboard).toHaveBeenCalledWith(TEST_SEED.words.join(" "));
-        expect(mockToast.success).toHaveBeenCalledWith(
-          "Seed phrase in clipboard \u2014 clears in 30s",
-        );
-      });
+      fireEvent.click(document.querySelector("[data-testid='hide-btn']")!);
+      expect(onHide).toHaveBeenCalledTimes(1);
     });
 
-    it("shows toast error when copy fails", async () => {
-      mockCopyToClipboard.mockRejectedValueOnce(new Error("copy failed"));
-
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={TEST_SEED}
-          onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
-        />
-      ));
-
-      const copyBtn = document.querySelector("[data-testid='copy-all-btn']");
-      fireEvent.click(copyBtn!);
-
-      await waitFor(() => {
-        expect(mockToast.error).toHaveBeenCalledWith("Failed to copy seed phrase");
-      });
-    });
-
-    it("shows passphrase indicator when hasPassphrase is true", () => {
-      render(() => (
+    it("shows passphrase indicator only when hasPassphrase is true", () => {
+      const { unmount } = render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={true}
           revealedData={TEST_SEED_WITH_PASSPHRASE}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
-
       expect(document.body.textContent).toContain("BIP39 passphrase is set");
-    });
+      unmount();
 
-    it("does not show passphrase indicator when hasPassphrase is false", () => {
       render(() => (
         <SeedViewer
           wordCount={12}
           hasPassphrase={false}
           revealedData={TEST_SEED}
           onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
+          onCopyAll={vi.fn()}
+          onHide={vi.fn()}
         />
       ));
-
       expect(document.body.textContent).not.toContain("BIP39 passphrase is set");
-    });
-  });
-
-  describe("countdown timer", () => {
-    it("decrements timer every second", async () => {
-      vi.useFakeTimers();
-
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={TEST_SEED}
-          onRevealRequest={vi.fn()}
-          onClear={vi.fn()}
-        />
-      ));
-
-      const timer = document.querySelector("[data-testid='countdown-timer']");
-      expect(timer!.textContent).toContain("60s");
-
-      vi.advanceTimersByTime(1000);
-      await waitFor(() => {
-        expect(timer!.textContent).toContain("59s");
-      });
-
-      vi.advanceTimersByTime(4000);
-      await waitFor(() => {
-        expect(timer!.textContent).toContain("55s");
-      });
-
-      vi.useRealTimers();
-    });
-
-    it("calls onClear when timer reaches zero", async () => {
-      vi.useFakeTimers();
-      const onClear = vi.fn();
-
-      render(() => (
-        <SeedViewer
-          wordCount={12}
-          hasPassphrase={false}
-          revealedData={TEST_SEED}
-          onRevealRequest={vi.fn()}
-          onClear={onClear}
-        />
-      ));
-
-      // Advance to just before expiry
-      vi.advanceTimersByTime(59000);
-      expect(onClear).not.toHaveBeenCalled();
-
-      // Advance to expiry
-      vi.advanceTimersByTime(1000);
-      await waitFor(() => {
-        expect(onClear).toHaveBeenCalledTimes(1);
-      });
-
-      vi.useRealTimers();
     });
   });
 });

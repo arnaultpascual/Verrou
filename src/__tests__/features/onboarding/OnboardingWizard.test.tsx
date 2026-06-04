@@ -43,7 +43,7 @@ vi.mock("../../../components", async (importOriginal) => {
   };
 });
 
-function renderWizard() {
+function renderRaw() {
   return render(() => (
     <MemoryRouter
       root={(props) => <>{props.children}</>}
@@ -51,6 +51,13 @@ function renderWizard() {
       <Route path="/*" component={() => <OnboardingWizard />} />
     </MemoryRouter>
   ));
+}
+
+function renderWizard() {
+  const result = renderRaw();
+  // Advance past the welcome gateway into the numbered wizard.
+  fireEvent.click(result.getByText("Get started"));
+  return result;
 }
 
 describe("OnboardingWizard", () => {
@@ -64,6 +71,17 @@ describe("OnboardingWizard", () => {
       vaultFingerprint: null,
       isCreating: false,
     });
+  });
+
+  it("opens on the welcome screen and advances on Get started", () => {
+    const { getByText, queryByText } = renderRaw();
+    expect(getByText("Your vault, and only yours")).toBeDefined();
+    // The numbered step indicator is hidden on the welcome gateway.
+    expect(queryByText("Step 1 of 4")).toBeNull();
+
+    fireEvent.click(getByText("Get started"));
+    expect(getByText("Step 1 of 4")).toBeDefined();
+    expect(getByText("Create your password")).toBeDefined();
   });
 
   it("renders step indicator", () => {
@@ -158,7 +176,7 @@ describe("OnboardingWizard", () => {
     // Step 3 → 4
     fireEvent.click(getByText("Next"));
     expect(getByText("Step 4 of 4")).toBeDefined();
-    expect(getByText("Import Existing Entries")).toBeDefined();
+    expect(getByText("Import existing entries")).toBeDefined();
     // No Next button on final step
     expect(queryByText("Next")).toBeNull();
   });

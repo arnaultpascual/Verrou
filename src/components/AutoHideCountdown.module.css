@@ -1,0 +1,32 @@
+/* AutoHideCountdown — shared timer bar for revealed secrets (reveal grammar) */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.label {
+  font-variant-numeric: tabular-nums;
+}
+
+.hideBtn {
+  flex-shrink: 0;
+}

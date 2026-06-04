@@ -318,15 +318,8 @@ pub fn analyze_password_health(
     let old_count = old_credentials.len() as u32;
     let no_totp_count = no_totp_credentials.len() as u32;
 
-    // 5. Compute overall health score.
-    let total_issues = reused_count + weak_count + old_count + no_totp_count;
-    let total_checks = total_credentials * 4;
-    let overall_score = if total_checks == 0 {
-        100
-    } else {
-        let penalty = (total_issues * 100) / total_checks;
-        100u32.saturating_sub(penalty)
-    };
+    // 5. Compute overall password-health score (No-2FA excluded — see compute_score).
+    let overall_score = compute_score(total_credentials, reused_count, weak_count, old_count);
 
     Ok(PasswordHealthReport {
         overall_score,
@@ -363,6 +356,32 @@ fn find_reused_groups(hashes: &[([u8; 32], String, String)]) -> Vec<ReusedGroup>
         .filter(|g| g.len() >= 2)
         .map(|credentials| ReusedGroup { credentials })
         .collect()
+}
+
+/// Compute the overall password-health score (0–100).
+///
+/// The score reflects **password hygiene only**. Each credential is checked on
+/// three axes — reused, weak, and old — so the denominator is
+/// `total_credentials * 3`, and the score is the share of those checks that
+/// pass.
+///
+/// Missing 2FA is deliberately **excluded**: a strong, unique, fresh password
+/// is healthy whether or not the site also offers a second factor. It was
+/// previously a fourth axis, which dragged the score down for what is really a
+/// coverage signal, not a password defect. `no_totp_*` is still reported so the
+/// UI can surface 2FA coverage separately, but it never enters this score.
+///
+/// Saturating arithmetic guarantees the result stays within `0..=100` even if a
+/// caller passes issue counts that exceed the number of checks.
+#[allow(clippy::arithmetic_side_effects)]
+const fn compute_score(total_credentials: u32, reused: u32, weak: u32, old: u32) -> u32 {
+    let total_checks = total_credentials * 3;
+    if total_checks == 0 {
+        return 100;
+    }
+    let total_issues = reused + weak + old;
+    let penalty = (total_issues * 100) / total_checks;
+    100u32.saturating_sub(penalty)
 }
 
 // ---------------------------------------------------------------------------
@@ -563,5 +582,32 @@ mod tests {
         assert_eq!(PasswordStrength::Fair.as_str(), "fair");
         assert_eq!(PasswordStrength::Good.as_str(), "good");
         assert_eq!(PasswordStrength::Excellent.as_str(), "excellent");
+    }
+
+    // -- compute_score: 3-axis password hygiene, No-2FA excluded --
+
+    #[test]
+    fn score_is_100_for_no_credentials() {
+        assert_eq!(compute_score(0, 0, 0, 0), 100);
+    }
+
+    #[test]
+    fn score_is_100_when_all_password_checks_pass() {
+        // No reused/weak/old → perfect, regardless of 2FA coverage.
+        assert_eq!(compute_score(5, 0, 0, 0), 100);
+    }
+
+    #[test]
+    fn score_excludes_missing_2fa() {
+        // 5 credentials, 4 password issues (2 reused + 1 weak + 1 old).
+        // Denominator is 5*3 = 15 (NOT 5*4 = 20); 2FA coverage never enters.
+        // penalty = 4*100/15 = 26 → score 74.
+        assert_eq!(compute_score(5, 2, 1, 1), 74);
+    }
+
+    #[test]
+    fn score_floors_at_zero_and_never_underflows() {
+        // Saturating arithmetic: even impossible over-counts can't underflow.
+        assert_eq!(compute_score(2, 2, 2, 2), 0);
     }
 }

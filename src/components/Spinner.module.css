@@ -11,10 +11,12 @@
 }
 
 .track {
+  stroke-width: var(--stroke-width-ring);
   opacity: 0.2;
 }
 
 .arc {
+  stroke-width: var(--stroke-width-ring);
   opacity: 1;
 }
 

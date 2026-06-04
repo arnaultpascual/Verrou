@@ -22,6 +22,8 @@
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
+  /* Indent by tree depth (--depth set inline per row; defaults to root). */
+  padding-left: calc(var(--spacing-sm) + var(--depth, 0) * var(--spacing-md));
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   font-size: var(--font-size-sm);
@@ -144,6 +146,8 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
+  /* Align the confirm prompt with its row's tree depth. */
+  margin-left: calc(var(--depth, 0) * var(--spacing-md));
   background-color: var(--color-surface-3);
   border-radius: var(--border-radius-sm);
 }
@@ -193,4 +197,79 @@
 
 .confirmBtnDanger:focus-visible {
   box-shadow: 0 0 0 2px var(--color-danger-focus-ring);
+}
+
+/* ── Tree nesting ── */
+
+.childList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inlineInputRow {
+  padding-left: calc(var(--spacing-sm) + var(--depth, 0) * var(--spacing-md));
+}
+
+/* ── Expand / collapse chevron ── */
+
+.chevronBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: calc(-1 * var(--spacing-xs));
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.chevronBtn:hover {
+  color: var(--color-text-primary);
+}
+
+.chevronBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.chevron {
+  transition: transform var(--duration-fast) var(--easing-default);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.chevronSpacer {
+  display: inline-block;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+/* Reorder arrows reuse the chevron glyph, rotated. */
+.iconUp {
+  transform: rotate(-90deg);
+}
+
+.iconDown {
+  transform: rotate(90deg);
+}
+
+/* ── Drag & drop affordances ── */
+
+.dragging {
+  opacity: 0.5;
+}
+
+.dragOver {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
 }

@@ -20,6 +20,27 @@
   margin: 0;
 }
 
+/* ── Active Filter Bar ── */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: calc(-1 * var(--spacing-xs));
+}
+
+.filterLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.resultCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}
+
 .loading,
 .error {
   font-size: var(--font-size-sm);

@@ -19,6 +19,7 @@ import { setVaultState } from "../../stores/vaultStore";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { BiometricSettings } from "./BiometricSettings";
 import { HardwareSecurityStatus } from "./HardwareSecurityStatus";
+import { SecurityPreferences } from "./SecurityPreferences";
 import { PreferencesSection } from "./PreferencesSection";
 import { SecurityInfoSection } from "./SecurityInfoSection";
 import { AboutSection } from "./AboutSection";
@@ -199,16 +200,18 @@ export const SettingsPage: Component = () => {
     <div class={styles.page}>
       <h1 class={styles.pageTitle}>{t("settings.title")}</h1>
 
-      {/* Preferences section — theme, timeout, startup */}
-      <PreferencesSection />
-
-      {/* Security section */}
-      <div class={styles.section}>
-        <h2 class={styles.sectionTitle}>{t("settings.security")}</h2>
+      {/* ═══ SECURITY group ═══ */}
+      <section class={styles.group} data-testid="group-security">
+        <h2 class={styles.groupTitle}>{t("settings.groups.security")}</h2>
 
         <BiometricSettings />
         <HardwareSecurityStatus />
 
+        {/* Auto-lock timeout + clipboard auto-clear */}
+        <SecurityPreferences />
+
+        {/* Change master password */}
+        <div class={styles.subsection}>
         <Show when={phase() === "idle"}>
           <p class={styles.sectionDescription}>
             {t("settings.securityDescription")}
@@ -378,14 +381,22 @@ export const SettingsPage: Component = () => {
             </button>
           </div>
         </Show>
-      </div>
+        </div>
+      </section>
+
+      {/* ═══ APPEARANCE group — PreferencesSection owns its own heading ═══ */}
+      <PreferencesSection />
 
       {/* Keyboard Shortcuts section */}
       <KeyboardShortcuts />
 
-      {/* Import section */}
-      <div class={styles.section}>
-        <h2 class={styles.sectionTitle}>{t("settings.importSection")}</h2>
+      {/* ═══ BACKUP & TRANSFER group ═══ */}
+      <section class={styles.group} data-testid="group-backup-transfer">
+        <h2 class={styles.groupTitle}>{t("settings.groups.backupTransfer")}</h2>
+
+      {/* Import subsection */}
+      <div class={styles.subsection}>
+        <h3 class={styles.subsectionTitle}>{t("settings.importSection")}</h3>
         <p class={styles.sectionDescription}>
           {t("settings.importDescription")}
         </p>
@@ -396,9 +407,9 @@ export const SettingsPage: Component = () => {
         </div>
       </div>
 
-      {/* Export & Backup section */}
-      <div class={styles.section}>
-        <h2 class={styles.sectionTitle}>{t("settings.exportSection")}</h2>
+      {/* Export & Backup subsection */}
+      <div class={styles.subsection}>
+        <h3 class={styles.subsectionTitle}>{t("settings.exportSection")}</h3>
         <p class={styles.sectionDescription}>
           {t("settings.exportDescription")}
         </p>
@@ -438,9 +449,9 @@ export const SettingsPage: Component = () => {
         onClose={() => setShowImportVault(false)}
       />
 
-      {/* Device Transfer section */}
-      <div class={styles.section}>
-        <h2 class={styles.sectionTitle}>{t("settings.deviceTransfer")}</h2>
+      {/* Device Transfer subsection */}
+      <div class={styles.subsection}>
+        <h3 class={styles.subsectionTitle}>{t("settings.deviceTransfer")}</h3>
         <p class={styles.sectionDescription}>
           {t("settings.deviceTransferDescription")}
         </p>
@@ -460,18 +471,10 @@ export const SettingsPage: Component = () => {
           </Button>
         </div>
       </div>
-      <QrTransferSendModal
-        open={showQrSend()}
-        onClose={() => setShowQrSend(false)}
-      />
-      <QrTransferReceiveModal
-        open={showQrReceive()}
-        onClose={() => setShowQrReceive(false)}
-      />
 
-      {/* Clipboard section */}
-      <div class={styles.section}>
-        <h2 class={styles.sectionTitle}>{t("settings.clipboard")}</h2>
+      {/* Clipboard subsection — informational note (timeout control lives in Security) */}
+      <div class={styles.subsection}>
+        <h3 class={styles.subsectionTitle}>{t("settings.clipboard")}</h3>
         <p class={styles.sectionDescription}>
           {t("settings.clipboardDescription")}
         </p>
@@ -482,6 +485,16 @@ export const SettingsPage: Component = () => {
           </span>
         </div>
       </div>
+      </section>
+
+      <QrTransferSendModal
+        open={showQrSend()}
+        onClose={() => setShowQrSend(false)}
+      />
+      <QrTransferReceiveModal
+        open={showQrReceive()}
+        onClose={() => setShowQrReceive(false)}
+      />
 
       {/* Danger Zone section */}
       <div class={`${styles.section} ${styles.dangerSection}`}>

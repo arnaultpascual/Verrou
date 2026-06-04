@@ -104,6 +104,18 @@ export interface TotpCodeDto {
   remainingSeconds: number;
 }
 
+/**
+ * HOTP code display result.
+ *
+ * `counter` is the counter value the returned `code` was computed from (the
+ * value *before* the advance). The stored counter is advanced to `counter + 1`
+ * as a side effect, so the next `generateHotpCode` call yields the next code.
+ */
+export interface HotpCodeDto {
+  code: string;
+  counter: number;
+}
+
 /** Note content search result. */
 export interface NoteSearchResult {
   entryId: string;
@@ -409,8 +421,18 @@ export async function deleteEntry(entryId: string): Promise<void> {
   mockStore.splice(idx, 1);
 }
 
-/** Generate a TOTP code for the given entry. Uses getEntry() (Rust-backed when in Tauri). */
+/**
+ * Generate a TOTP code for the given entry.
+ *
+ * In Tauri the code is computed in Rust via `generate_totp_code` — the Base32
+ * secret never crosses the IPC boundary. The mock path computes it client-side.
+ */
 export async function generateTotpCode(entryId: string): Promise<TotpCodeDto> {
+  if (IS_TAURI) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<TotpCodeDto>("generate_totp_code", { entryId });
+  }
+
   const entry = await getEntry(entryId);
   if (entry.entryType !== "totp") {
     throw "Entry is not a TOTP entry.";
@@ -428,6 +450,76 @@ export async function generateTotpCode(entryId: string): Promise<TotpCodeDto> {
 
   const code = await computeHotp(secretBytes, counter, algo, digits);
   return { code, remainingSeconds };
+}
+
+/**
+ * Generate the next HOTP code for the given entry and advance its counter.
+ *
+ * HOTP is event-based (RFC 4226): there is no time window or countdown. The
+ * code is computed from the entry's *current* stored counter via the same
+ * `computeHotp` primitive TOTP uses, then the counter is persisted as
+ * `counter + 1` so the next call returns the next code.
+ *
+ * In Tauri the code is generated and the counter advanced atomically in Rust
+ * via `generate_hotp_code` (the secret never crosses IPC). The mock path
+ * computes it client-side and persists `counter + 1` via `updateEntry`.
+ *
+ * Returns `{ code, counter }` where `counter` is the value the code was
+ * generated from (pre-advance).
+ */
+export async function generateHotpCode(entryId: string): Promise<HotpCodeDto> {
+  if (IS_TAURI) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<HotpCodeDto>("generate_hotp_code", { entryId });
+  }
+
+  const entry = await getEntry(entryId);
+  if (entry.entryType !== "hotp") {
+    throw "Entry is not a HOTP entry.";
+  }
+
+  const counter = entry.counter ?? 0;
+  const secretBytes = decodeBase32(entry.secret);
+  const algo = entry.algorithm?.toUpperCase() === "SHA256" ? "SHA-256"
+    : entry.algorithm?.toUpperCase() === "SHA512" ? "SHA-512"
+    : "SHA-1";
+  const digits = entry.digits || 6;
+
+  const code = await computeHotp(secretBytes, counter, algo, digits);
+
+  // Advance + persist the counter exactly once per generation. The vault stores
+  // the *next* counter so the same code is never produced twice.
+  await updateEntry({ id: entryId, counter: counter + 1 });
+
+  return { code, counter };
+}
+
+/**
+ * Reveal an entry's raw Base32 OTP secret after re-authentication.
+ *
+ * This is the ONLY path that returns a raw OTP secret to the frontend, and it
+ * exists solely to build an `otpauth://` export URI. Requires master-password
+ * re-entry; in Tauri the secret is fetched via the re-auth-gated
+ * `reveal_otp_secret` command (session auth alone is insufficient — the secret
+ * is otherwise withheld from `get_entry`).
+ */
+export async function revealOtpSecret(entryId: string, password: string): Promise<string> {
+  if (IS_TAURI) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const result = await invoke<{ secret: string }>("reveal_otp_secret", {
+      entryId,
+      password,
+    });
+    return result.secret;
+  }
+  // Mock: simulate KDF delay, then return the stored secret.
+  await delay(500);
+  const entry = mockStore.find((e) => e.id === entryId);
+  if (!entry) throw "Entry not found.";
+  if (entry.entryType !== "totp" && entry.entryType !== "hotp") {
+    throw "Entry is not a TOTP/HOTP entry.";
+  }
+  return entry.secret;
 }
 
 // ---------------------------------------------------------------------------

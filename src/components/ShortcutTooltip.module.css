@@ -19,3 +19,26 @@
   box-shadow: var(--shadow-popup);
   z-index: var(--z-popup);
 }
+
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-xs) / 2);
+}
+
+.key {
+  display: inline-block;
+  padding: 0 var(--spacing-xs);
+  min-width: var(--spacing-lg);
+  background-color: var(--color-surface-3);
+  border: var(--border-default);
+  border-radius: var(--border-radius-xs);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.separator {
+  color: var(--color-text-muted);
+}

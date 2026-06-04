@@ -1,4 +1,4 @@
-import { render, fireEvent } from "@solidjs/testing-library";
+import { render, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { EntryCard } from "../../../features/entries/EntryCard";
 import type { EntryMetadataDto } from "../../../features/entries/ipc";
@@ -319,14 +319,85 @@ describe("EntryCard", () => {
   });
 
   describe("HOTP content zone", () => {
-    it("renders placeholder code for HOTP", () => {
+    it("renders a Generate button (no live code, no countdown) for HOTP", () => {
       render(() => <EntryCard entry={hotpEntry} />);
-      expect(document.body.textContent).toContain("--- ---");
+      const generate = document.querySelector("[data-testid='hotp-generate']");
+      expect(generate).toBeTruthy();
+      expect(document.body.textContent).toContain("Generate");
+      // HOTP is counter-based — no placeholder code, no countdown ring.
+      expect(document.body.textContent).not.toContain("--- ---");
+      expect(document.querySelector("[data-testid='countdown-ring']")).toBeNull();
     });
 
     it("renders HOTP badge", () => {
       render(() => <EntryCard entry={hotpEntry} />);
       expect(document.body.textContent).toContain("HOTP");
+    });
+
+    it("generates the next code, copies it, and shows the advanced counter on click", async () => {
+      // Stored counter for the mock HOTP entry (Legacy VPN) is 42.
+      render(() => <EntryCard entry={hotpEntry} />);
+      const generate = document.querySelector("[data-testid='hotp-generate']") as HTMLElement;
+      fireEvent.click(generate);
+
+      // Concealed clipboard write of a raw 6-digit code.
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledTimes(1);
+      });
+      expect(writeTextMock.mock.calls[0][0]).toMatch(/^\d{6}$/);
+
+      // The produced code is shown (grouped 3-3).
+      const codeEl = document.querySelector("[data-testid='hotp-code']");
+      expect(codeEl?.textContent).toMatch(/^\d{3} \d{3}$/);
+
+      // Counter is reflected as advanced (42 → 43).
+      expect(document.querySelector("[data-testid='hotp-counter']")?.textContent).toContain("43");
+    });
+
+    it("advances the persisted counter by exactly one per generate (no double-advance)", async () => {
+      // Mock HOTP entry "Legacy VPN" starts at counter 42.
+      render(() => <EntryCard entry={hotpEntry} />);
+      const generate = document.querySelector("[data-testid='hotp-generate']") as HTMLElement;
+
+      // One generate → persisted counter advances 42 → 43.
+      fireEvent.click(generate);
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(async () => {
+        expect((await ipc.getEntry(hotpEntry.id)).counter).toBe(43);
+      });
+
+      // A second generate advances 43 → 44 — exactly one step each time.
+      const trigger2 = document.querySelector("[data-testid='hotp-generate']") as HTMLElement;
+      fireEvent.click(trigger2);
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledTimes(2);
+      });
+      await waitFor(async () => {
+        expect((await ipc.getEntry(hotpEntry.id)).counter).toBe(44);
+      });
+    });
+
+    it("does not trigger card onSelect when generating", async () => {
+      const onSelect = vi.fn();
+      render(() => <EntryCard entry={hotpEntry} onSelect={onSelect} />);
+      const generate = document.querySelector("[data-testid='hotp-generate']") as HTMLElement;
+      fireEvent.click(generate);
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledTimes(1);
+      });
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("generates the next code on Enter key on the card", async () => {
+      render(() => <EntryCard entry={hotpEntry} onSelect={vi.fn()} />);
+      const card = document.querySelector("li");
+      fireEvent.keyDown(card!, { key: "Enter" });
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledTimes(1);
+      });
+      expect(writeTextMock.mock.calls[0][0]).toMatch(/^\d{6}$/);
     });
   });
 

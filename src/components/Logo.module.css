@@ -1,0 +1,19 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.mark {
+  flex: none;
+  display: block;
+}
+
+.wordmark {
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  letter-spacing: var(--letter-spacing-xs);
+  color: var(--color-text-primary);
+  line-height: 1;
+}

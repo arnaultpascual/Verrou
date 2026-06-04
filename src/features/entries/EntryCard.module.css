@@ -138,11 +138,66 @@
 .codeZoneCopyable {
   cursor: pointer;
   border-radius: var(--border-radius-sm);
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   transition: background var(--duration-fast) var(--easing-default);
 }
 
 .codeZoneCopyable:hover {
   background: var(--color-surface-2);
+}
+
+.codeZoneCopyable:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── HOTP Generate Zone ── */
+
+.hotpZone {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.generateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: var(--border-default);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--easing-default),
+    color var(--duration-fast) var(--easing-default);
+}
+
+.generateBtn:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text-primary);
+}
+
+.generateBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.regenIcon {
+  color: var(--color-text-muted);
+}
+
+.hotpCounter {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
 }
 
 /* ── Seed Phrase Zone ── */

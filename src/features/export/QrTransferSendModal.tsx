@@ -342,6 +342,7 @@ export const QrTransferSendModal: Component<QrTransferSendModalProps> = (
       {/* Phase: Transfer — QR display */}
       <Show when={phase() === "transfer"}>
         <div class={styles.transferContent}>
+          <p class={styles.crossDevice}>{t("export.qrTransfer.send.crossDeviceHint")}</p>
           <p class={styles.description}>
             {t("export.qrTransfer.send.verificationPrompt")}
           </p>

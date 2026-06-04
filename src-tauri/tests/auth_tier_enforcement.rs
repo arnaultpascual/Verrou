@@ -12,8 +12,10 @@
 //!
 //! - [`test_get_entry_recovery_code_secret_is_empty`] — same gate, recovery codes.
 //!
-//! - [`test_get_entry_totp_secret_is_returned`] — positive control: TOTP entries
-//!   are NOT gated so their secret must flow through `get_entry` normally.
+//! - [`test_get_entry_totp_secret_is_empty`] — the same gate extended to OTP:
+//!   `get_entry` must withhold the raw TOTP/HOTP secret too. Codes are produced
+//!   server-side (`generate_totp_code`); the raw secret only crosses IPC via
+//!   `reveal_otp_secret` (re-auth), never under session-only auth.
 //!
 //! - [`test_restore_vault_backup_rejects_wrong_password`] — the H3 fix: the
 //!   `restore_vault_backup` command authenticates the caller with `unlock_vault`
@@ -114,16 +116,20 @@ fn setup_vault(dir: &Path, password: &[u8]) -> (verrou_vault::VaultDb, SecretByt
 }
 
 /// The secret-gating predicate that `get_entry` (IPC command) applies
-/// before returning `EntryDetailDto`.  Mirrors the exact match block at
-/// `src-tauri/src/commands/entries.rs` lines 868-872.
+/// before returning `EntryDetailDto`.  Mirrors the exact `extract_secret`
+/// match block in `src-tauri/src/commands/entries.rs`.
 ///
-/// Returns an empty string for `SeedPhrase` and `RecoveryCode` entries
-/// (re-auth required); returns the plaintext secret for all other types.
+/// Returns an empty string for every type whose plaintext is re-auth-gated
+/// (`Totp`, `Hotp`, `SeedPhrase`, `RecoveryCode`, `Credential`).  TOTP/HOTP
+/// codes are produced server-side by `generate_totp_code`/`generate_hotp_code`,
+/// and the raw OTP secret only leaves Rust via `reveal_otp_secret` (re-auth).
+/// Only `SecureNote` bodies (display content, not a key) flow through directly.
 fn command_layer_secret(data: &EntryData) -> String {
     match data {
-        EntryData::Totp { secret } | EntryData::Hotp { secret } => secret.clone(),
         EntryData::SecureNote { body, .. } => body.clone(),
-        EntryData::SeedPhrase { .. }
+        EntryData::Totp { .. }
+        | EntryData::Hotp { .. }
+        | EntryData::SeedPhrase { .. }
         | EntryData::RecoveryCode { .. }
         | EntryData::Credential { .. } => String::new(),
     }
@@ -277,15 +283,16 @@ fn test_get_entry_recovery_code_secret_is_empty() {
     );
 }
 
-/// `get_entry` MUST return the decrypted secret for `totp` entries.
+/// `get_entry` MUST return an empty `secret` for `totp` entries.
 ///
-/// TOTP codes do not require re-authentication — the secret is needed
-/// to generate time-based codes.  This is the positive-control test:
-/// the H1 gate must NOT suppress TOTP secrets.
+/// The raw OTP secret is a key, not display content: returning it to the
+/// untrusted `WebView` under session-only auth would expose every 2FA seed.
+/// The display-safe code is produced server-side by `generate_totp_code`,
+/// and the raw secret only flows through `reveal_otp_secret` (re-auth).
 #[test]
-fn test_get_entry_totp_secret_is_returned() {
+fn test_get_entry_totp_secret_is_empty() {
     let tmp = tempfile::tempdir().expect("failed to create tempdir");
-    let password = b"totp-positive-control-pw";
+    let password = b"totp-gate-pw";
 
     let (db, master_key) = setup_vault(tmp.path(), password);
 
@@ -316,9 +323,10 @@ fn test_get_entry_totp_secret_is_returned() {
         .expect("get_entry should succeed for existing totp entry");
 
     let ipc_secret = command_layer_secret(&fetched.data);
-    assert_eq!(
-        ipc_secret, totp_secret,
-        "get_entry must return the decrypted secret for totp entries (positive control)"
+    assert!(
+        ipc_secret.is_empty(),
+        "get_entry must NOT return the raw TOTP secret under session-only auth; \
+         use generate_totp_code (code) or reveal_otp_secret (re-auth)"
     );
 }
 

@@ -1,7 +1,7 @@
 import type { Component } from "solid-js";
 import { createSignal, Show, Switch, Match, onCleanup, onMount } from "solid-js";
 import type { EntryMetadataDto } from "../entries/ipc";
-import { revealPassword, copyToClipboard, generateTotpCode } from "../entries/ipc";
+import { revealPassword, copyToClipboard, generateHotpCode } from "../entries/ipc";
 import { useTotpCode } from "../entries/useTotpCode";
 import { formatTotpCode } from "../entries/formatCode";
 import { CountdownRing } from "../entries/CountdownRing";
@@ -324,39 +324,49 @@ const TotpLiveDetail: Component<{ entry: EntryMetadataDto; toast: ReturnType<typ
   );
 };
 
+/**
+ * HOTP is counter-based, so unlike TOTP there is no live code to show on mount.
+ * The user explicitly generates the next code; generating advances + persists
+ * the counter, copies the code to the concealed clipboard, and hides the popup.
+ * The code is cleared on focus loss / unmount so it never lingers in the DOM.
+ */
 const HotpDetail: Component<{ entry: EntryMetadataDto }> = (props) => {
   const toast = useToast();
   const [code, setCode] = createSignal("");
+  const [counter, setCounter] = createSignal<number | null>(null);
+  const [isGenerating, setIsGenerating] = createSignal(false);
 
   onMount(async () => {
-    try {
-      const result = await generateTotpCode(props.entry.id);
-      setCode(result.code);
-    } catch {
-      // silent
-    }
-
     const unlisten = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (!focused) setCode("");
+      if (!focused) {
+        setCode("");
+        setCounter(null);
+      }
     });
     onCleanup(unlisten);
   });
 
   onCleanup(() => {
     setCode("");
+    setCounter(null);
   });
 
-  const copyCode = async () => {
-    const c = code();
-    if (!c) return;
+  const generateAndCopy = async () => {
+    if (isGenerating()) return;
+    setIsGenerating(true);
     try {
-      await copyToClipboard(c);
+      const result = await generateHotpCode(props.entry.id);
+      setCode(result.code);
+      setCounter(result.counter + 1);
+      await copyToClipboard(result.code);
       toast.success(t("quickAccess.detail.codeCopied"));
       setTimeout(async () => {
         await getCurrentWindow().hide();
       }, 500);
     } catch {
       // silent
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -365,14 +375,21 @@ const HotpDetail: Component<{ entry: EntryMetadataDto }> = (props) => {
       <Show when={props.entry.issuer}>
         <span class={styles.totpIssuer}>{props.entry.issuer}</span>
       </Show>
-      <div class={styles.totpCodeRow}>
-        <span class={styles.totpCode}>
-          {formatTotpCode(code(), props.entry.digits)}
-        </span>
-      </div>
-      <button class={styles.totpCopyBtn} onClick={copyCode}>
-        <Icon name="copy" size={14} />
-        <span>{t("quickAccess.detail.copyCode")}</span>
+      <Show when={code()}>
+        <div class={styles.totpCodeRow}>
+          <span class={styles.totpCode}>
+            {formatTotpCode(code(), props.entry.digits)}
+          </span>
+        </div>
+        <Show when={counter() !== null}>
+          <span class={styles.totpIssuer}>
+            {t("quickAccess.detail.counterValue", { counter: String(counter()) })}
+          </span>
+        </Show>
+      </Show>
+      <button class={styles.totpCopyBtn} onClick={generateAndCopy} disabled={isGenerating()}>
+        <Icon name="refresh" size={14} />
+        <span>{t("quickAccess.detail.generateCode")}</span>
       </button>
     </div>
   );

@@ -55,11 +55,16 @@ computer.
   exponential backoff.
 
 ### A5 — Untrusted / compromised WebView
-- **Defense:** IPC returns DTOs only (never domain entities); seed phrases and
-  recovery codes are **not** returned by general read commands — only via
-  re-authenticated `reveal_*` paths; backup *restore* requires password re-auth;
-  the untrusted import parsers and export-envelope parser are bounds-checked and
-  fuzzed (no panic/OOM on arbitrary input).
+- **Defense:** IPC returns DTOs only (never domain entities). Raw secrets —
+  seed phrases, recovery codes, **TOTP/HOTP secrets**, and credential passwords —
+  are **not** returned by general read commands (`get_entry`). TOTP/HOTP codes
+  are computed server-side in Rust (`generate_totp_code` / `generate_hotp_code`),
+  so the raw OTP seed never crosses the boundary on session auth; it leaves Rust
+  only via the re-authenticated `reveal_otp_secret` (used to build an
+  `otpauth://` export). Seed phrases, recovery codes, and passwords likewise
+  reveal only through re-authenticated `reveal_*` paths; backup *restore*
+  requires password re-auth; the untrusted import parsers and export-envelope
+  parser are bounds-checked and fuzzed (no panic/OOM on arbitrary input).
 
 ### A6 — Memory disclosure (swap, core dump, cold boot)
 - **Defense:** key material is `mlock`-pinned and `Zeroize`d on drop; secret

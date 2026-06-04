@@ -11,6 +11,7 @@ export interface EntryListProps {
   entries: EntryMetadataDto[];
   onSelect?: (id: string) => void;
   onAdd?: () => void;
+  onClearSearch?: () => void;
   onTogglePin?: (entryId: string, pinned: boolean) => void;
   searchQuery?: string;
   recoveryStats?: RecoveryStatsMap;
@@ -88,6 +89,11 @@ export const EntryList: Component<EntryListProps> = (props) => {
             <p class={styles.emptyText}>
               {t("entries.emptySearch", { query: props.searchQuery ?? "" })}
             </p>
+            <Show when={props.onClearSearch}>
+              <Button variant="secondary" onClick={() => props.onClearSearch?.()}>
+                {t("entries.clearSearch")}
+              </Button>
+            </Show>
           </div>
         </Show>
       }

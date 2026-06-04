@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { Show, createSignal, createEffect, createMemo, onMount } from "solid-js";
+import { Show, createSignal, createEffect, onMount } from "solid-js";
 import { Button, Icon, Spinner, useToast } from "../../components";
 import { wizardStore, setWizardStore } from "./stores";
 import { createVault, getRecoveryKey } from "./ipc";
@@ -11,123 +11,60 @@ export interface RecoveryKeyStepProps {
   onValidChange: (valid: boolean) => void;
 }
 
-/** Milestone-based phases for vault creation. */
-const PHASE_KEYS = [
-  "onboarding.recoveryKey.phase1",
-  "onboarding.recoveryKey.phase2",
-  "onboarding.recoveryKey.phase3",
-  "onboarding.recoveryKey.phase4",
-  "onboarding.recoveryKey.phase5",
-] as const;
-
-const PHASES = [
-  { key: PHASE_KEYS[0], target: 15 },
-  { key: PHASE_KEYS[1], target: 45 },
-  { key: PHASE_KEYS[2], target: 70 },
-  { key: PHASE_KEYS[3], target: 90 },
-  { key: PHASE_KEYS[4], target: 100 },
-] as const;
+/** Normalize a recovery key for comparison: drop separators, upper-case. */
+function normalizeKey(s: string): string {
+  return s.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
 
 export const RecoveryKeyStep: Component<RecoveryKeyStepProps> = (props) => {
-  const [phase, setPhase] = createSignal(0);
-  const [progress, setProgress] = createSignal(0);
   const [creationDone, setCreationDone] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
+  const [confirmInput, setConfirmInput] = createSignal("");
   const toast = useToast();
-
-  const phaseMessage = createMemo(() => t(PHASES[phase()].key));
 
   createEffect(() => {
     props.onValidChange(wizardStore.recoveryKeyConfirmed);
   });
 
-  /**
-   * Smoothly animate progress toward a target over `durationMs`.
-   * Returns a cleanup function to stop the animation.
-   */
-  function animateTo(target: number, durationMs: number): () => void {
-    const start = progress();
-    const delta = target - start;
-    if (delta <= 0) { setProgress(target); return () => {}; }
-    const startTime = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / durationMs);
-      // Ease-out for natural deceleration
-      const eased = 1 - (1 - t) * (1 - t);
-      setProgress(Math.round(start + delta * eased));
-      if (t < 1) { raf = requestAnimationFrame(tick); }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }
-
   onMount(() => {
+    // Already created (e.g. navigating back) — skip straight to the save view.
     if (wizardStore.recoveryKey) {
       setCreationDone(true);
-      setProgress(100);
-      setPhase(4);
       return;
     }
 
     setWizardStore("isCreating", true);
-    setPhase(0);
-
-    // Yield a frame so the browser paints the progress view before
-    // the heavy IPC call potentially blocks the event loop.
-    let stopAnim = () => {};
-    requestAnimationFrame(() => {
-      stopAnim = animateTo(PHASES[0].target, 800);
-    });
-
-    // Creep through phases while backend works
-    const creepInterval = setInterval(() => {
-      setPhase((p) => {
-        const next = Math.min(p + 1, 2); // Cap at phase 2 until backend resolves
-        if (next !== p) {
-          stopAnim();
-          stopAnim = animateTo(PHASES[next].target, 2000);
-        }
-        return next;
-      });
-    }, 2500);
-
+    // Honest by construction: we await the REAL vault creation + recovery-key
+    // generation. No scripted phase list, no fake percentage bar — just an
+    // indeterminate "working" state that ends when the backend actually does.
     createVault(wizardStore.password, wizardStore.kdfPreset)
-      .then(() => {
-        clearInterval(creepInterval);
-        stopAnim();
-        // Backend done — jump to "Generating recovery key" phase
-        setPhase(3);
-        stopAnim = animateTo(PHASES[3].target, 600);
-        return getRecoveryKey();
-      })
+      .then(() => getRecoveryKey())
       .then((result) => {
-        stopAnim();
         setWizardStore("recoveryKey", result.formattedKey);
         setWizardStore("vaultFingerprint", result.vaultFingerprint);
-        // Complete: set progress directly and transition after brief pause
-        setPhase(4);
-        setProgress(100);
-        setTimeout(() => setCreationDone(true), 500);
+        setCreationDone(true);
       })
       .catch(() => {
-        clearInterval(creepInterval);
-        stopAnim();
         setError(t("onboarding.recoveryKey.errorCreate"));
         toast.error(t("onboarding.recoveryKey.toastFailed"));
-        setProgress(0);
       })
       .finally(() => {
-        clearInterval(creepInterval);
         setWizardStore("isCreating", false);
       });
   });
 
-  const handleConfirmChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setWizardStore("recoveryKeyConfirmed", target.checked);
+  // Confirm by re-entry: the user must type their key back (separators/case
+  // ignored). We drive `recoveryKeyConfirmed` imperatively so a value preset
+  // elsewhere (e.g. navigating back into the step) is preserved until the
+  // field is actually touched.
+  const handleConfirmInput = (value: string) => {
+    setConfirmInput(value);
+    const key = wizardStore.recoveryKey;
+    setWizardStore(
+      "recoveryKeyConfirmed",
+      !!key && normalizeKey(value) === normalizeKey(key),
+    );
   };
 
   const handleCopy = async () => {
@@ -145,11 +82,15 @@ export const RecoveryKeyStep: Component<RecoveryKeyStepProps> = (props) => {
   return (
     <div class={styles.step}>
       <h2 class={styles.heading}>
-        {creationDone() ? t("onboarding.recoveryKey.headingSave") : t("onboarding.recoveryKey.headingCreating")}
+        {creationDone()
+          ? t("onboarding.recoveryKey.headingSave")
+          : t("onboarding.recoveryKey.headingCreating")}
       </h2>
 
       <Show when={error()}>
-        <p class={styles.error} role="alert">{error()}</p>
+        <p class={styles.error} role="alert">
+          {error()}
+        </p>
       </Show>
 
       <Show when={!creationDone() && !error()}>
@@ -157,35 +98,18 @@ export const RecoveryKeyStep: Component<RecoveryKeyStepProps> = (props) => {
           <div class={styles.spinnerContainer}>
             <Spinner size={48} />
           </div>
-
-          <p class={styles.phaseMessage}>{phaseMessage()}</p>
-
-          <div class={styles.progressWrapper}>
-            <div
-              class={styles.progressBar}
-              role="progressbar"
-              aria-valuenow={Math.round(progress())}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={t("onboarding.recoveryKey.ariaCreating")}
-            >
-              <div
-                class={styles.progressFill}
-                style={{ width: `${progress()}%` }}
-              />
-            </div>
-          </div>
-
-          <p class={styles.progressHint}>
-            {t("onboarding.recoveryKey.progressHint")}
-          </p>
+          <p class={styles.phaseMessage}>{t("onboarding.recoveryKey.encrypting")}</p>
+          <p class={styles.progressHint}>{t("onboarding.recoveryKey.encryptingHint")}</p>
         </div>
       </Show>
 
       <Show when={creationDone()}>
-        <p class={styles.description}>
-          {t("onboarding.recoveryKey.description")}
-        </p>
+        <div class={styles.warning}>
+          <Icon name="alert" size={16} class={styles.warningIcon} />
+          <span>{t("onboarding.recoveryKey.shownOnce")}</span>
+        </div>
+
+        <p class={styles.description}>{t("onboarding.recoveryKey.description")}</p>
 
         <div class={styles.keyDisplay}>
           <code class={styles.keyText} data-testid="recovery-key">
@@ -195,16 +119,13 @@ export const RecoveryKeyStep: Component<RecoveryKeyStepProps> = (props) => {
 
         <Show when={wizardStore.vaultFingerprint}>
           <p class={styles.fingerprint}>
-            {t("onboarding.recoveryKey.fingerprint")} <code>{wizardStore.vaultFingerprint}</code>
+            {t("onboarding.recoveryKey.fingerprint")}{" "}
+            <code>{wizardStore.vaultFingerprint}</code>
           </p>
         </Show>
 
         <div class={styles.actions}>
-          <Button
-            variant="ghost"
-            onClick={handleCopy}
-            data-testid="copy-recovery-key"
-          >
+          <Button variant="ghost" onClick={handleCopy} data-testid="copy-recovery-key">
             <Icon name={copied() ? "check" : "copy"} size={14} />
             {copied() ? t("onboarding.recoveryKey.copied") : t("onboarding.recoveryKey.copy")}
           </Button>
@@ -213,14 +134,27 @@ export const RecoveryKeyStep: Component<RecoveryKeyStepProps> = (props) => {
           </Button>
         </div>
 
-        <label class={styles.confirmLabel}>
+        <div class={styles.confirm}>
+          <label class={styles.confirmInputLabel} for="recovery-confirm">
+            {t("onboarding.recoveryKey.confirmReentry")}
+          </label>
           <input
-            type="checkbox"
-            checked={wizardStore.recoveryKeyConfirmed}
-            onChange={handleConfirmChange}
+            id="recovery-confirm"
+            class={styles.confirmInput}
+            value={confirmInput()}
+            onInput={(e) => handleConfirmInput(e.currentTarget.value)}
+            placeholder={t("onboarding.recoveryKey.confirmPlaceholder")}
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck={false}
+            data-testid="recovery-confirm-input"
           />
-          <span>{t("onboarding.recoveryKey.confirmLabel")}</span>
-        </label>
+          <Show when={confirmInput().length > 0 && !wizardStore.recoveryKeyConfirmed}>
+            <span class={styles.confirmHint} role="status">
+              {t("onboarding.recoveryKey.confirmMismatch")}
+            </span>
+          </Show>
+        </div>
       </Show>
     </div>
   );

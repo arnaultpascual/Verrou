@@ -34,9 +34,14 @@ export const HardwareSecurityStatus: Component = () => {
         <Show
           when={isAvailable()}
           fallback={
-            <p class={styles.unavailableMessage} data-testid="hw-unavailable">
-              {t("settings.hardware.unavailable")}
-            </p>
+            <div data-testid="hw-unavailable">
+              <p class={styles.unavailableMessage}>
+                {t("settings.hardware.unavailable")}
+              </p>
+              <p class={styles.unavailableHint}>
+                {t("settings.hardware.unavailableHint")}
+              </p>
+            </div>
           }
         >
           <p

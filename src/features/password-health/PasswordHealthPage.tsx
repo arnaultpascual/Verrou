@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import { createResource, createSignal, Show, For } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { Icon, Button, useToast } from "../../components";
+import { EditCredentialModal } from "../credentials/EditCredentialModal";
 import { t } from "../../stores/i18nStore";
 import { getPasswordHealth } from "./ipc";
 import type {
@@ -13,14 +14,13 @@ import type {
 import styles from "./PasswordHealthPage.module.css";
 
 // ---------------------------------------------------------------------------
-// Score ring SVG
+// Score helpers
 // ---------------------------------------------------------------------------
 
 const RING_RADIUS = 32;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 function scoreColor(score: number): string {
-  if (score >= 90) return styles.excellent;
   if (score >= 70) return styles.good;
   if (score >= 50) return styles.warning;
   return styles.danger;
@@ -34,27 +34,84 @@ function scoreLabel(score: number): string {
 }
 
 function scoreCssVar(score: number): string {
-  if (score >= 90) return "var(--color-success)";
   if (score >= 70) return "var(--color-success)";
   if (score >= 50) return "var(--color-warning)";
   return "var(--color-danger)";
 }
 
-// ---------------------------------------------------------------------------
-// Category card
-// ---------------------------------------------------------------------------
-
-interface CategoryCardProps {
-  title: string;
-  icon: "alert" | "shield" | "lock" | "info";
-  count: number;
-  cardClass: string;
-  countClass: string;
-  children: any;
+/** Friendly label for a weak/fair strength tier. */
+function strengthLabel(strength: string): string {
+  return strength === "weak"
+    ? t("passwordHealth.strengthWeak")
+    : t("passwordHealth.strengthFair");
 }
 
-const CategoryCard: Component<CategoryCardProps> = (props) => {
+/** Humanize "days since the password changed" into a calm relative phrase. */
+function humanizeAge(days: number): string {
+  if (days >= 730) {
+    return t("passwordHealth.ageOverYears", { years: String(Math.floor(days / 365)) });
+  }
+  if (days >= 365) return t("passwordHealth.ageOverYear");
+  if (days >= 180) return t("passwordHealth.ageOverSixMonths");
+  const months = Math.max(1, Math.round(days / 30));
+  return t("passwordHealth.ageMonths", { count: String(months) });
+}
+
+// ---------------------------------------------------------------------------
+// Small pieces
+// ---------------------------------------------------------------------------
+
+const Chip: Component<{ text: string; tone: "danger" | "warning" }> = (props) => (
+  <span
+    class={`${styles.chip} ${props.tone === "danger" ? styles.chipDanger : styles.chipWarning}`}
+  >
+    {props.text}
+  </span>
+);
+
+/** Honest, expandable explanation of how the score is computed. */
+const ScoreExplainer: Component = () => {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <div class={styles.explainer}>
+      <button
+        type="button"
+        class={styles.explainerToggle}
+        aria-expanded={open()}
+        onClick={() => setOpen(!open())}
+      >
+        <Icon name="info" size={13} />
+        {t("passwordHealth.scoreExplainerToggle")}
+      </button>
+      <Show when={open()}>
+        <p class={styles.explainerPanel}>{t("passwordHealth.scoreExplainer")}</p>
+      </Show>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Scored category card (reused / weak / old) — expandable, with inline Fix
+// ---------------------------------------------------------------------------
+
+interface IssueRow {
+  id: string;
+  name: string;
+  chip?: { text: string; tone: "danger" | "warning" };
+}
+
+interface ScoredCardProps {
+  title: string;
+  icon: "alert" | "shield" | "info";
+  rows: IssueRow[];
+  cardClass: string;
+  countClass: string;
+  onFix: (id: string, name: string) => void;
+}
+
+const ScoredCard: Component<ScoredCardProps> = (props) => {
   const [expanded, setExpanded] = createSignal(false);
+  const count = () => props.rows.length;
 
   return (
     <div class={`${styles.card} ${props.cardClass}`}>
@@ -76,9 +133,7 @@ const CategoryCard: Component<CategoryCardProps> = (props) => {
           <span class={styles.cardTitle}>{props.title}</span>
         </div>
         <div class={styles.cardInfo}>
-          <span class={`${styles.cardCount} ${props.countClass}`}>
-            {props.count}
-          </span>
+          <span class={`${styles.cardCount} ${props.countClass}`}>{count()}</span>
           <Icon
             name="chevron-right"
             size={14}
@@ -86,47 +141,86 @@ const CategoryCard: Component<CategoryCardProps> = (props) => {
           />
         </div>
       </div>
-      <Show when={expanded() && props.count > 0}>
-        <div class={styles.credentialList}>{props.children}</div>
+      <Show when={expanded() && count() > 0}>
+        <div class={styles.credentialList}>
+          <For each={props.rows}>
+            {(row) => (
+              <div class={styles.issueRow}>
+                <span class={styles.credentialName}>{row.name}</span>
+                <div class={styles.itemRight}>
+                  <Show when={row.chip}>
+                    {(chip) => <Chip text={chip().text} tone={chip().tone} />}
+                  </Show>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => props.onFix(row.id, row.name)}
+                    aria-label={t("passwordHealth.fixAria", { name: row.name })}
+                    data-testid="health-fix-btn"
+                  >
+                    <Icon name="key" size={14} /> {t("passwordHealth.fix")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </For>
+        </div>
       </Show>
     </div>
   );
 };
 
 // ---------------------------------------------------------------------------
-// Credential list item
+// 2FA coverage — separate, NOT part of the password score
 // ---------------------------------------------------------------------------
 
-interface CredentialItemProps {
-  id: string;
-  name: string;
-  meta?: string;
-}
-
-const CredentialItem: Component<CredentialItemProps> = (props) => {
+const TwoFactorCoverage: Component<{
+  credentials: CredentialRef[];
+  total: number;
+}> = (props) => {
   const navigate = useNavigate();
-  const target = () => `/entries?type=credential&highlight=${props.id}`;
+  const view = (id: string) => navigate(`/entries?type=credential&highlight=${id}`);
 
   return (
-    <div
-      class={styles.credentialItem}
-      role="button"
-      tabIndex={0}
-      onClick={() => navigate(target())}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") navigate(target());
-      }}
-    >
-      <span class={styles.credentialName}>{props.name}</span>
-      <Show when={props.meta}>
-        <span class={styles.credentialMeta}>{props.meta}</span>
-      </Show>
-    </div>
+    <section class={styles.coverage} aria-labelledby="coverage-title">
+      <div class={styles.coverageHead}>
+        <div class={styles.cardInfo}>
+          <Icon name="shield-check" size={16} class={styles.coverageIcon} />
+          <span id="coverage-title" class={styles.sectionTitle}>
+            {t("passwordHealth.coverageTitle")}
+          </span>
+        </div>
+        <span class={styles.coverageMeta}>
+          {t("passwordHealth.coverageSummary", {
+            count: String(props.credentials.length),
+            total: String(props.total),
+          })}
+        </span>
+      </div>
+      <p class={styles.sectionHint}>{t("passwordHealth.coverageHint")}</p>
+      <div class={styles.credentialList}>
+        <For each={props.credentials}>
+          {(cred) => (
+            <div class={styles.issueRow}>
+              <span class={styles.credentialName}>{cred.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => view(cred.id)}
+                aria-label={t("passwordHealth.addTwoFactorAria", { name: cred.name })}
+              >
+                <Icon name="shield" size={14} /> {t("passwordHealth.addTwoFactor")}
+              </Button>
+            </div>
+          )}
+        </For>
+      </div>
+    </section>
   );
 };
 
 // ---------------------------------------------------------------------------
-// Loading skeleton
+// Loading / empty states
 // ---------------------------------------------------------------------------
 
 const LoadingSkeleton: Component = () => (
@@ -136,19 +230,14 @@ const LoadingSkeleton: Component = () => (
       <div class={styles.skeletonCard} />
       <div class={styles.skeletonCard} />
       <div class={styles.skeletonCard} />
-      <div class={styles.skeletonCard} />
     </div>
   </div>
 );
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
-
 const EmptyState: Component<{ hasCredentials: boolean }> = (props) => (
   <div class={styles.emptyState}>
     <Icon
-      name={props.hasCredentials ? "shield" : "info"}
+      name={props.hasCredentials ? "shield-check" : "info"}
       size={48}
       class={props.hasCredentials ? styles.emptyIcon : ""}
     />
@@ -165,17 +254,188 @@ const EmptyState: Component<{ hasCredentials: boolean }> = (props) => (
   </div>
 );
 
+/** Compact "passwords are all strong" note (shown when only 2FA coverage remains). */
+const PasswordsHealthyNote: Component = () => (
+  <div class={styles.healthyNote}>
+    <Icon name="check" size={16} class={styles.healthyNoteIcon} />
+    <span>{t("passwordHealth.passwordsAllStrong")}</span>
+  </div>
+);
+
 // ---------------------------------------------------------------------------
-// Main page
+// Dashboard
+// ---------------------------------------------------------------------------
+
+const HealthDashboard: Component<{
+  report: PasswordHealthReport;
+  onFix: (id: string, name: string) => void;
+}> = (props) => {
+  const r = () => props.report;
+
+  // The score reflects PASSWORD hygiene only (reused/weak/old). Missing 2FA is
+  // tracked separately below and intentionally excluded — mirrors the backend.
+  const passwordIssues = () => r().reusedCount + r().weakCount + r().oldCount;
+  const hasPasswordIssues = () => passwordIssues() > 0;
+  const hasNoTotp = () => r().noTotpCount > 0;
+
+  // Flatten reused groups into rows, annotated with "shared with N more".
+  const reusedRows = (): IssueRow[] =>
+    r().reusedGroups.flatMap((group) =>
+      group.credentials.map((cred) => ({
+        id: cred.id,
+        name: cred.name,
+        chip: {
+          text: t("passwordHealth.reusedSharedWith", {
+            count: String(Math.max(1, group.credentials.length - 1)),
+          }),
+          tone: "danger" as const,
+        },
+      })),
+    );
+
+  const weakRows = (): IssueRow[] =>
+    r().weakCredentials.map((cred: WeakCredential) => ({
+      id: cred.id,
+      name: cred.name,
+      chip: {
+        text: strengthLabel(cred.strength),
+        tone: cred.strength === "weak" ? ("danger" as const) : ("warning" as const),
+      },
+    }));
+
+  const oldRows = (): IssueRow[] =>
+    r().oldCredentials.map((cred: OldCredential) => ({
+      id: cred.id,
+      name: cred.name,
+      chip: {
+        text: humanizeAge(cred.daysSinceChange),
+        tone: cred.severity === "danger" ? ("danger" as const) : ("warning" as const),
+      },
+    }));
+
+  return (
+    <Show
+      when={r().totalCredentials > 0}
+      fallback={<EmptyState hasCredentials={false} />}
+    >
+      {/* Score */}
+      <div class={styles.scoreSection}>
+        <div class={styles.scoreRing}>
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle
+              cx="40"
+              cy="40"
+              r={RING_RADIUS}
+              fill="none"
+              stroke="var(--color-surface-3)"
+              stroke-width="6"
+            />
+            <circle
+              cx="40"
+              cy="40"
+              r={RING_RADIUS}
+              fill="none"
+              stroke={scoreCssVar(r().overallScore)}
+              stroke-width="6"
+              stroke-linecap="round"
+              stroke-dasharray={String(RING_CIRCUMFERENCE)}
+              stroke-dashoffset={String(RING_CIRCUMFERENCE * (1 - r().overallScore / 100))}
+            />
+          </svg>
+          <span class={`${styles.scoreValue} ${scoreColor(r().overallScore)}`}>
+            {r().overallScore}
+          </span>
+        </div>
+        <div class={styles.scoreDetails}>
+          <span class={styles.scoreLabel}>{scoreLabel(r().overallScore)}</span>
+          <span class={styles.scoreSummary}>
+            {hasPasswordIssues()
+              ? t("passwordHealth.issuesSummary", {
+                  total: String(passwordIssues()),
+                  credentials: String(r().totalCredentials),
+                })
+              : t("passwordHealth.allCredentialsHealthy", {
+                  count: String(r().totalCredentials),
+                })}
+          </span>
+          <ScoreExplainer />
+        </div>
+      </div>
+
+      {/* Scored password categories, or a healthy state */}
+      <Show
+        when={hasPasswordIssues()}
+        fallback={
+          <Show when={hasNoTotp()} fallback={<EmptyState hasCredentials={true} />}>
+            <PasswordsHealthyNote />
+          </Show>
+        }
+      >
+        <div class={styles.categories}>
+          <Show when={r().reusedCount > 0}>
+            <ScoredCard
+              title={t("passwordHealth.reusedPasswords")}
+              icon="alert"
+              rows={reusedRows()}
+              cardClass={styles.cardReused}
+              countClass={styles.countDanger}
+              onFix={props.onFix}
+            />
+          </Show>
+          <Show when={r().weakCount > 0}>
+            <ScoredCard
+              title={t("passwordHealth.weakPasswords")}
+              icon="shield"
+              rows={weakRows()}
+              cardClass={styles.cardWeak}
+              countClass={styles.countWarning}
+              onFix={props.onFix}
+            />
+          </Show>
+          <Show when={r().oldCount > 0}>
+            <ScoredCard
+              title={t("passwordHealth.oldPasswords")}
+              icon="info"
+              rows={oldRows()}
+              cardClass={styles.cardOld}
+              countClass={styles.countWarning}
+              onFix={props.onFix}
+            />
+          </Show>
+        </div>
+      </Show>
+
+      {/* 2FA coverage — separate, non-scored */}
+      <Show when={hasNoTotp()}>
+        <TwoFactorCoverage
+          credentials={r().noTotpCredentials}
+          total={r().totalCredentials}
+        />
+      </Show>
+    </Show>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Page
 // ---------------------------------------------------------------------------
 
 export const PasswordHealthPage: Component = () => {
   const toast = useToast();
   const [report, { refetch }] = createResource(getPasswordHealth);
 
+  // Inline remediation: the credential being "fixed" (password rotation) via
+  // the canonical EditCredentialModal — which preserves every other field.
+  const [fixEntry, setFixEntry] = createSignal<{ id: string; name: string } | null>(null);
+
   const handleRefresh = () => {
     refetch();
     toast.info(t("passwordHealth.toastAnalyzing"));
+  };
+
+  const handleFixSuccess = () => {
+    setFixEntry(null);
+    refetch();
   };
 
   return (
@@ -194,7 +454,12 @@ export const PasswordHealthPage: Component = () => {
 
       <Show when={!report.loading} fallback={<LoadingSkeleton />}>
         <Show when={report()}>
-          {(data) => <HealthDashboard report={data()} />}
+          {(data) => (
+            <HealthDashboard
+              report={data()}
+              onFix={(id, name) => setFixEntry({ id, name })}
+            />
+          )}
         </Show>
         <Show when={report.error}>
           <div class={styles.emptyState}>
@@ -208,155 +473,14 @@ export const PasswordHealthPage: Component = () => {
           </div>
         </Show>
       </Show>
+
+      {/* Remediation modal — rotates the password (old → history), keeps the rest. */}
+      <EditCredentialModal
+        open={fixEntry() !== null}
+        entryId={fixEntry()?.id ?? ""}
+        onClose={() => setFixEntry(null)}
+        onSuccess={handleFixSuccess}
+      />
     </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Dashboard content
-// ---------------------------------------------------------------------------
-
-const HealthDashboard: Component<{ report: PasswordHealthReport }> = (
-  props,
-) => {
-  const r = () => props.report;
-  const totalIssues = () =>
-    r().reusedCount + r().weakCount + r().oldCount + r().noTotpCount;
-  const hasIssues = () => totalIssues() > 0;
-
-  return (
-    <>
-      <Show
-        when={r().totalCredentials > 0}
-        fallback={<EmptyState hasCredentials={false} />}
-      >
-        {/* Score section */}
-        <div class={styles.scoreSection}>
-          <div class={styles.scoreRing}>
-            <svg width="80" height="80" viewBox="0 0 80 80">
-              <circle
-                cx="40"
-                cy="40"
-                r={RING_RADIUS}
-                fill="none"
-                stroke="var(--color-surface-3)"
-                stroke-width="6"
-              />
-              <circle
-                cx="40"
-                cy="40"
-                r={RING_RADIUS}
-                fill="none"
-                stroke={scoreCssVar(r().overallScore)}
-                stroke-width="6"
-                stroke-linecap="round"
-                stroke-dasharray={String(RING_CIRCUMFERENCE)}
-                stroke-dashoffset={String(
-                  RING_CIRCUMFERENCE * (1 - r().overallScore / 100)
-                )}
-              />
-            </svg>
-            <span class={`${styles.scoreValue} ${scoreColor(r().overallScore)}`}>
-              {r().overallScore}
-            </span>
-          </div>
-          <div class={styles.scoreDetails}>
-            <span class={styles.scoreLabel}>
-              {scoreLabel(r().overallScore)}
-            </span>
-            <span class={styles.scoreSummary}>
-              {hasIssues()
-                ? t("passwordHealth.issuesSummary", { total: String(totalIssues()), credentials: String(r().totalCredentials) })
-                : t("passwordHealth.allCredentialsHealthy", { count: String(r().totalCredentials) })}
-            </span>
-          </div>
-        </div>
-
-        <Show
-          when={hasIssues()}
-          fallback={<EmptyState hasCredentials={true} />}
-        >
-          <div class={styles.categories}>
-            {/* Reused passwords */}
-            <CategoryCard
-              title={t("passwordHealth.reusedPasswords")}
-              icon="alert"
-              count={r().reusedCount}
-              cardClass={r().reusedCount > 0 ? styles.cardReused : ""}
-              countClass={
-                r().reusedCount > 0 ? styles.countDanger : styles.countSuccess
-              }
-            >
-              <For each={r().reusedGroups}>
-                {(group) => (
-                  <For each={group.credentials}>
-                    {(cred) => <CredentialItem id={cred.id} name={cred.name} />}
-                  </For>
-                )}
-              </For>
-            </CategoryCard>
-
-            {/* Weak passwords */}
-            <CategoryCard
-              title={t("passwordHealth.weakPasswords")}
-              icon="shield"
-              count={r().weakCount}
-              cardClass={r().weakCount > 0 ? styles.cardWeak : ""}
-              countClass={
-                r().weakCount > 0 ? styles.countWarning : styles.countSuccess
-              }
-            >
-              <For each={r().weakCredentials}>
-                {(cred: WeakCredential) => (
-                  <CredentialItem
-                    id={cred.id}
-                    name={cred.name}
-                    meta={cred.strength}
-                  />
-                )}
-              </For>
-            </CategoryCard>
-
-            {/* Old passwords */}
-            <CategoryCard
-              title={t("passwordHealth.oldPasswords")}
-              icon="info"
-              count={r().oldCount}
-              cardClass={r().oldCount > 0 ? styles.cardOld : ""}
-              countClass={
-                r().oldCount > 0 ? styles.countWarning : styles.countSuccess
-              }
-            >
-              <For each={r().oldCredentials}>
-                {(cred: OldCredential) => (
-                  <CredentialItem
-                    id={cred.id}
-                    name={cred.name}
-                    meta={`${cred.daysSinceChange}d`}
-                  />
-                )}
-              </For>
-            </CategoryCard>
-
-            {/* Missing 2FA */}
-            <CategoryCard
-              title={t("passwordHealth.no2fa")}
-              icon="lock"
-              count={r().noTotpCount}
-              cardClass={r().noTotpCount > 0 ? styles.cardNoTotp : ""}
-              countClass={
-                r().noTotpCount > 0 ? styles.countMuted : styles.countSuccess
-              }
-            >
-              <For each={r().noTotpCredentials}>
-                {(cred: CredentialRef) => (
-                  <CredentialItem id={cred.id} name={cred.name} />
-                )}
-              </For>
-            </CategoryCard>
-          </div>
-        </Show>
-      </Show>
-    </>
   );
 };

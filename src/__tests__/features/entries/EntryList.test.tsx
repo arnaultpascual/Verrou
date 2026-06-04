@@ -126,5 +126,31 @@ describe("EntryList", () => {
       );
       expect(addBtn).toBeUndefined();
     });
+
+    it("shows a Clear search button when onClearSearch is provided", () => {
+      render(() => <EntryList entries={[]} searchQuery="zzz" onClearSearch={vi.fn()} />);
+      const clearBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Clear search"),
+      );
+      expect(clearBtn).toBeTruthy();
+    });
+
+    it("calls onClearSearch when Clear search is clicked", () => {
+      const onClearSearch = vi.fn();
+      render(() => <EntryList entries={[]} searchQuery="zzz" onClearSearch={onClearSearch} />);
+      const clearBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Clear search"),
+      );
+      clearBtn?.click();
+      expect(onClearSearch).toHaveBeenCalled();
+    });
+
+    it("does not show Clear search button without onClearSearch", () => {
+      render(() => <EntryList entries={[]} searchQuery="zzz" />);
+      const clearBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Clear search"),
+      );
+      expect(clearBtn).toBeUndefined();
+    });
   });
 });

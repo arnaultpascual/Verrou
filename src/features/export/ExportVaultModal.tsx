@@ -17,33 +17,37 @@ export interface ExportVaultModalProps {
   onClose: () => void;
 }
 
-type Phase = "input" | "exporting" | "success" | "error";
+type Phase = "location" | "input" | "exporting" | "success" | "error";
 
 export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
   const toast = useToast();
 
   const [password, setPassword] = createSignal("");
-  const [phase, setPhase] = createSignal<Phase>("input");
+  const [phase, setPhase] = createSignal<Phase>("location");
   const [progress, setProgress] = createSignal(0);
   const [errorMessage, setErrorMessage] = createSignal("");
   const [result, setResult] = createSignal<ExportVaultResponse | null>(null);
   const [shake, setShake] = createSignal(false);
+  const [savePath, setSavePath] = createSignal("");
   const [exportFilename, setExportFilename] = createSignal("");
 
   let progressInterval: ReturnType<typeof setInterval> | undefined;
 
-  // Reset state when modal opens/closes
+  const basename = (p: string) => p.split(/[\\/]/).pop() || "vault-export.verrou";
+
+  // Reset state when the modal opens.
   createEffect(
     on(
       () => props.open,
       (open) => {
         if (open) {
           setPassword("");
-          setPhase("input");
+          setPhase("location");
           setProgress(0);
           setErrorMessage("");
           setResult(null);
           setShake(false);
+          setSavePath("");
           setExportFilename("");
         }
       },
@@ -55,28 +59,29 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
     setPassword("");
   });
 
+  // Step 1 (low-stakes): choose the destination BEFORE asking for the password,
+  // so cancelling the native save dialog never costs a typed master password.
+  const handleChooseLocation = async () => {
+    const path = await pickExportLocation();
+    if (!path) return; // cancelled — stay on the location step
+    setSavePath(path);
+    setExportFilename(basename(path));
+    setPhase("input");
+  };
+
+  // Step 2 (high-stakes): authenticate, then export to the already-chosen path.
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    if (!password() || phase() === "exporting") return;
+    if (!password() || phase() === "exporting" || !savePath()) return;
 
-    // Step 1: Pick save location first
-    const savePath = await pickExportLocation();
-    if (!savePath) return; // User cancelled
-
-    // Extract filename for display
-    const parts = savePath.split(/[\\/]/);
-    setExportFilename(parts[parts.length - 1] || "vault-export.verrou");
-
-    // Step 2: Start export with ceremony animation
     setPhase("exporting");
     setProgress(0);
-
     progressInterval = setInterval(() => {
       setProgress((prev) => (prev >= 90 ? prev : prev + 5));
     }, 100);
 
     try {
-      const exportResult = await exportVault(password(), savePath);
+      const exportResult = await exportVault(password(), savePath());
 
       if (progressInterval) clearInterval(progressInterval);
       setProgress(100);
@@ -101,7 +106,7 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
   const handleRetry = () => {
     setPassword("");
     setErrorMessage("");
-    setPhase("input");
+    setPhase("input"); // keep the already-chosen location
   };
 
   return (
@@ -111,11 +116,38 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
       title={t("export.vault.title")}
       closeOnOverlayClick={false}
     >
-      {/* Phase: Password input */}
+      {/* Phase: choose the destination first */}
+      <Show when={phase() === "location"}>
+        <div class={styles.form}>
+          <p class={styles.description}>{t("export.vault.description")}</p>
+          <p class={styles.trust}>
+            <Icon name="lock" size={14} class={styles.trustIcon} />
+            <span>{t("export.vault.trust")}</span>
+          </p>
+          <div class={styles.actions}>
+            <Button variant="ghost" onClick={props.onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleChooseLocation} data-testid="export-choose-location">
+              {t("export.vault.chooseLocationButton")}
+            </Button>
+          </div>
+        </div>
+      </Show>
+
+      {/* Phase: authenticate (destination already chosen) */}
       <Show when={phase() === "input"}>
         <form onSubmit={handleSubmit} class={styles.form}>
-          <p class={styles.description}>
-            {t("export.vault.description")}
+          <p class={styles.savingTo}>
+            {t("export.vault.savingTo", { filename: exportFilename() })}{" "}
+            <button
+              type="button"
+              class={styles.changeBtn}
+              onClick={() => setPhase("location")}
+              data-testid="export-change-location"
+            >
+              {t("export.vault.changeLocation")}
+            </button>
           </p>
           <PasswordInput
             label={t("export.vault.passwordLabel")}
@@ -128,18 +160,14 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
             <Button variant="ghost" onClick={props.onClose}>
               {t("common.cancel")}
             </Button>
-            <Button
-              type="submit"
-              disabled={!password()}
-              data-testid="export-vault-submit"
-            >
+            <Button type="submit" disabled={!password()} data-testid="export-vault-submit">
               {t("export.vault.submitButton")}
             </Button>
           </div>
         </form>
       </Show>
 
-      {/* Phase: Exporting with ceremony */}
+      {/* Phase: exporting */}
       <Show when={phase() === "exporting"}>
         <div class={styles.ceremonyWrapper}>
           <SecurityCeremony
@@ -151,7 +179,7 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
         </div>
       </Show>
 
-      {/* Phase: Success */}
+      {/* Phase: success */}
       <Show when={phase() === "success" && result()}>
         <div class={styles.successContent}>
           <div class={styles.successIcon}>
@@ -169,9 +197,7 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
             </li>
             <li class={styles.statItem}>
               <span class={styles.statLabel}>{t("export.vault.attachments")}</span>
-              <span class={styles.statValue}>
-                {result()!.attachmentCount}
-              </span>
+              <span class={styles.statValue}>{result()!.attachmentCount}</span>
             </li>
           </ul>
           <div class={styles.actions}>
@@ -182,11 +208,9 @@ export const ExportVaultModal: Component<ExportVaultModalProps> = (props) => {
         </div>
       </Show>
 
-      {/* Phase: Error */}
+      {/* Phase: error */}
       <Show when={phase() === "error"}>
-        <div
-          class={`${styles.errorContent} ${shake() ? styles.shake : ""}`}
-        >
+        <div class={`${styles.errorContent} ${shake() ? styles.shake : ""}`}>
           <p class={styles.error} role="alert" data-testid="export-error">
             {errorMessage()}
           </p>

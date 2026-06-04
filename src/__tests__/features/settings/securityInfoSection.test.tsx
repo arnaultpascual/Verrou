@@ -26,6 +26,24 @@ describe("SecurityInfoSection", () => {
     expect(section.textContent).toContain("X25519 + ML-KEM-1024");
   });
 
+  it("leads each value row with plain language and relocates the acronym to a code tag", () => {
+    const { getByTestId } = render(() => <SecurityInfoSection />);
+    const section = getByTestId("security-info-section");
+
+    // Plain-language primaries are present…
+    expect(section.textContent).toContain("Authenticated");
+    expect(section.textContent).toContain("Memory-hard");
+    expect(section.textContent).toContain("Hybrid post-quantum");
+
+    // …and the raw acronyms live inside <code> (secondary), not the primary label.
+    const techCodes = Array.from(section.querySelectorAll("dd code")).map(
+      (el) => el.textContent,
+    );
+    expect(techCodes).toContain("AES-256-GCM");
+    expect(techCodes).toContain("Argon2id");
+    expect(techCodes).toContain("X25519 + ML-KEM-1024");
+  });
+
   it("shows learn more toggle button", () => {
     const { getByTestId } = render(() => <SecurityInfoSection />);
     const toggle = getByTestId("learn-more-toggle");

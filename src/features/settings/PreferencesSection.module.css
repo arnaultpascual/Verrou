@@ -8,9 +8,12 @@
 
 .sectionTitle {
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-xs);
   margin: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: var(--border-default);
 }
 
 /* ── Theme selector ───────────────────────────────────── */
@@ -97,36 +100,12 @@
 }
 
 .languageSelect:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--border-color-strong);
 }
 
 .languageSelect:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-}
-
-/* ── Lock timeout slider ──────────────────────────────── */
-
-.sliderRow {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
-
-.slider {
-  flex: 1;
-  accent-color: var(--color-primary);
-  cursor: pointer;
-  height: 4px;
-}
-
-.sliderValue {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  min-width: 52px;
-  text-align: right;
-  white-space: nowrap;
 }
 
 /* ── Toggle row ───────────────────────────────────────── */

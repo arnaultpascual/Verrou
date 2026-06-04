@@ -1,4 +1,4 @@
-import { render } from "@solidjs/testing-library";
+import { render, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { RecoveryKeyStep } from "../../../features/onboarding/RecoveryKeyStep";
 import { wizardStore, setWizardStore } from "../../../features/onboarding/stores";
@@ -65,20 +65,19 @@ describe("RecoveryKeyStep", () => {
     expect(getByText("Save your recovery key")).toBeDefined();
   });
 
-  it("shows phase message initially", () => {
+  it("shows an honest indeterminate 'encrypting' message initially", () => {
     const { getByText } = render(() => (
       <RecoveryKeyStep onValidChange={vi.fn()} />
     ));
-    expect(getByText("Calibrating encryption parameters...")).toBeDefined();
+    expect(getByText("Encrypting your vault…")).toBeDefined();
   });
 
-  it("shows SecurityCeremony during creation", () => {
+  it("does NOT show a fake progress bar during creation", () => {
     const { container } = render(() => (
       <RecoveryKeyStep onValidChange={vi.fn()} />
     ));
-    // SecurityCeremony renders a progressbar
-    const progressbar = container.querySelector("[role='progressbar']");
-    expect(progressbar).not.toBeNull();
+    // Honest by construction: an indeterminate spinner, never a scripted % bar.
+    expect(container.querySelector("[role='progressbar']")).toBeNull();
   });
 
   it("calls onValidChange(false) when recovery key is not confirmed", () => {
@@ -114,17 +113,43 @@ describe("RecoveryKeyStep", () => {
     expect(getByText("Print")).toBeDefined();
   });
 
-  it("shows confirmation checkbox after creation", () => {
+  it("shows a confirm-by-re-entry field (not a checkbox) after creation", () => {
     setWizardStore("recoveryKey", "SOME-KEY");
-    const { getByText, container } = render(() => (
+    const { getByText, getByTestId, container } = render(() => (
       <RecoveryKeyStep onValidChange={vi.fn()} />
     ));
-    expect(getByText("I have saved my recovery key")).toBeDefined();
-    const checkbox = container.querySelector("input[type='checkbox']");
-    expect(checkbox).not.toBeNull();
+    expect(
+      getByText("Re-enter your recovery key to confirm you've saved it"),
+    ).toBeDefined();
+    expect(getByTestId("recovery-confirm-input")).toBeDefined();
+    // The old "just tick a box" affordance is gone.
+    expect(container.querySelector("input[type='checkbox']")).toBeNull();
   });
 
-  it("calls onValidChange(true) when checkbox is pre-checked in store", () => {
+  it("warns that the recovery key is shown only once", () => {
+    setWizardStore("recoveryKey", "SOME-KEY");
+    const { getByText } = render(() => (
+      <RecoveryKeyStep onValidChange={vi.fn()} />
+    ));
+    expect(getByText(/shown once/)).toBeDefined();
+  });
+
+  it("only confirms when the key is re-entered correctly (case/separator-insensitive)", () => {
+    setWizardStore("recoveryKey", "TEST-ABCD-EFGH-JKLM");
+    const onValid = vi.fn();
+    const { getByTestId } = render(() => <RecoveryKeyStep onValidChange={onValid} />);
+    const input = getByTestId("recovery-confirm-input") as HTMLInputElement;
+
+    fireEvent.input(input, { target: { value: "wrong" } });
+    expect(onValid).not.toHaveBeenCalledWith(true);
+    expect(wizardStore.recoveryKeyConfirmed).toBe(false);
+
+    fireEvent.input(input, { target: { value: "test abcd efgh jklm" } });
+    expect(wizardStore.recoveryKeyConfirmed).toBe(true);
+    expect(onValid).toHaveBeenCalledWith(true);
+  });
+
+  it("calls onValidChange(true) when already confirmed in store", () => {
     setWizardStore("recoveryKey", "SOME-KEY");
     setWizardStore("recoveryKeyConfirmed", true);
     const onValid = vi.fn();

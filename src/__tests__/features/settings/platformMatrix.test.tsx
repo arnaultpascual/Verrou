@@ -172,7 +172,7 @@ describe("Platform capability matrix", () => {
 
     const { findByTestId: findHw } = render(() => <HardwareSecurityStatus />);
     const hwMsg = await findHw("hw-unavailable");
-    expect(hwMsg.textContent).toContain("not available");
+    expect(hwMsg.textContent).toContain("software encryption only");
   });
 
   // -- Matrix: hardware only --
@@ -228,7 +228,7 @@ describe("Platform capability matrix", () => {
 
     const { findByTestId: findHw } = render(() => <HardwareSecurityStatus />);
     const hwMsg = await findHw("hw-unavailable");
-    expect(hwMsg.textContent).toContain("not available");
+    expect(hwMsg.textContent).toContain("software encryption only");
   });
 
   // -- VM scenario --

@@ -65,10 +65,50 @@ function renderModal(
   return { ...result, onClose };
 }
 
+/**
+ * Drive the re-auth gate: wait for the prompt, enter a password, submit.
+ * The export content (URI + QR) only appears after this succeeds.
+ */
+async function passReAuth(password = "master-pass") {
+  await waitFor(() => {
+    expect(document.body.textContent).toContain("Verify Your Identity");
+  });
+  const passwordInput = document.querySelector(
+    "input[type='password']",
+  ) as HTMLInputElement;
+  fireEvent.input(passwordInput, { target: { value: password } });
+  const form = document.querySelector("form") as HTMLFormElement;
+  fireEvent.submit(form);
+}
+
 describe("ExportUriModal", () => {
+  describe("re-auth gate", () => {
+    it("shows the re-auth prompt before revealing anything", () => {
+      renderModal();
+      // The export content must not be present until re-auth succeeds.
+      expect(
+        document.querySelector("[data-testid='export-uri-text']"),
+      ).toBeNull();
+      expect(document.body.textContent).toContain("Verify Your Identity");
+    });
+
+    it("surfaces an inline error when the reveal fails", async () => {
+      renderModal({ entryId: "non-existent-id" });
+      await passReAuth();
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("Entry not found.");
+      });
+      // Still gated — no URI leaked.
+      expect(
+        document.querySelector("[data-testid='export-uri-text']"),
+      ).toBeNull();
+    });
+  });
+
   describe("rendering and warning (AC #1, #2)", () => {
     it("displays the warning about secret exposure", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         expect(document.body.textContent).toContain(
@@ -81,14 +121,16 @@ describe("ExportUriModal", () => {
 
     it("shows modal title 'Export OTP Account'", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         expect(document.body.textContent).toContain("Export OTP Account");
       });
     });
 
-    it("displays the otpauth:// URI after loading", async () => {
+    it("displays the otpauth:// URI after re-auth", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         const uriEl = document.querySelector("[data-testid='export-uri-text']");
@@ -100,6 +142,7 @@ describe("ExportUriModal", () => {
 
     it("renders the QR code component with URI data (AC #3)", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         const qr = document.querySelector("[data-testid='qr-code']");
@@ -110,6 +153,7 @@ describe("ExportUriModal", () => {
 
     it("shows Copy URI button", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         const copyBtn = document.querySelector("[data-testid='copy-uri-btn']");
@@ -120,6 +164,7 @@ describe("ExportUriModal", () => {
 
     it("shows Close button", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         const closeBtn = document.querySelector(
@@ -128,17 +173,12 @@ describe("ExportUriModal", () => {
         expect(closeBtn).toBeTruthy();
       });
     });
-
-    it("shows loading state initially", () => {
-      renderModal();
-      // Loading state appears before async getEntry resolves
-      expect(document.body.textContent).toContain("Loading entry");
-    });
   });
 
   describe("copy functionality", () => {
     it("shows success toast when URI is copied", async () => {
       renderModal();
+      await passReAuth();
 
       await waitFor(() => {
         expect(
@@ -163,6 +203,7 @@ describe("ExportUriModal", () => {
     it("calls onClose when Close button is clicked", async () => {
       const onClose = vi.fn();
       renderModal({ onClose });
+      await passReAuth();
 
       await waitFor(() => {
         expect(
@@ -180,41 +221,6 @@ describe("ExportUriModal", () => {
   });
 
   describe("DOM cleanup on close (AC #4)", () => {
-    it("clears URI and QR data when modal closes", async () => {
-      const { unmount } = render(() => {
-        const [open, setOpen] = (() => {
-          let value = true;
-          const signal = () => value;
-          const setter = (v: boolean) => {
-            value = v;
-          };
-          return [signal, setter] as const;
-        })();
-
-        // We can't easily toggle SolidJS signals from outside,
-        // so we test that closing (open=false) clears the URI by
-        // rendering with open=false and checking no URI is shown
-        return (
-          <ExportUriModal
-            open={false}
-            onClose={() => {}}
-            entryId={TOTP_ENTRY_ID}
-            name="GitHub"
-            issuer="github.com"
-            entryType="totp"
-          />
-        );
-      });
-
-      // When closed, no URI text or QR should be in the DOM
-      expect(
-        document.querySelector("[data-testid='export-uri-text']"),
-      ).toBeNull();
-      expect(document.querySelector("[data-testid='qr-code']")).toBeNull();
-
-      unmount();
-    });
-
     it("does not display URI when modal is not open", () => {
       renderModal({ open: false });
 
@@ -223,17 +229,8 @@ describe("ExportUriModal", () => {
         document.querySelector("[data-testid='export-uri-text']"),
       ).toBeNull();
       expect(document.querySelector("[data-testid='qr-code']")).toBeNull();
-    });
-  });
-
-  describe("error handling", () => {
-    it("shows error message when entry fetch fails", async () => {
-      renderModal({ entryId: "non-existent-id" });
-
-      await waitFor(() => {
-        const alert = document.querySelector("[role='alert']");
-        expect(alert).toBeTruthy();
-      });
+      // Nor the re-auth gate.
+      expect(document.body.textContent).not.toContain("Verify Your Identity");
     });
   });
 });

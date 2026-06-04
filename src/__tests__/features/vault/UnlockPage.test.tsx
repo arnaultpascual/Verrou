@@ -114,11 +114,14 @@ describe("UnlockPage", () => {
     });
   });
 
-  it("shows unlock progress view during unlock attempt", async () => {
+  it("shows an honest indeterminate in-flight indicator while unlock is pending", async () => {
     const ipc = await import("../../../features/vault/ipc");
-    // Make unlock take a long time so we can check the progress state
+    // Keep the unlock promise pending so we can observe the in-flight state.
+    // The real Argon2id KDF is the genuine wait — we surface an indeterminate
+    // indicator, not a scripted progress bar.
+    let resolveUnlock: ((value: { unlockCount: number }) => void) | undefined;
     (ipc.unlockVault as ReturnType<typeof vi.fn>).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ unlockCount: 1 }), 5000))
+      () => new Promise<{ unlockCount: number }>((resolve) => { resolveUnlock = resolve; })
     );
 
     const { container, getByText } = renderWithRouter();
@@ -130,11 +133,27 @@ describe("UnlockPage", () => {
     fireEvent.submit(form!);
 
     await waitFor(() => {
-      expect(getByText("Vault is locked")).toBeDefined();
-      expect(getByText("vault.unlock.progress.deriving")).toBeDefined();
+      // Indeterminate "Unlocking vault" heading is shown.
+      expect(getByText("Unlocking vault")).toBeDefined();
+      // The in-flight region is a live status (indeterminate), NOT a determinate
+      // progress bar with a scripted value.
       const progressbar = container.querySelector("[role='progressbar']");
-      expect(progressbar).not.toBeNull();
+      expect(progressbar).toBeNull();
+      const status = container.querySelector("[role='status']");
+      expect(status).not.toBeNull();
     });
+
+    // No scripted phase text — these old strings must not appear.
+    expect(() => getByText("Deriving encryption key...")).toThrow();
+    expect(() => getByText("Verifying password...")).toThrow();
+    expect(() => getByText("Strong encryption takes a moment to verify — this is by design."))
+      .toThrow();
+
+    // The password form is no longer mounted while unlocking.
+    expect(container.querySelector("form")).toBeNull();
+
+    // Resolve to avoid leaking a pending promise across tests.
+    resolveUnlock?.({ unlockCount: 1 });
   });
 
   it("shows error message on wrong password", async () => {

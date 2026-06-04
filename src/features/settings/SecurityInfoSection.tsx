@@ -16,15 +16,24 @@ export const SecurityInfoSection: Component = () => {
       <dl class={styles.infoList}>
         <div class={styles.infoRow}>
           <dt class={styles.label}>{t("settings.securityInfo.encryptionLabel")}</dt>
-          <dd class={styles.value}>{t("settings.securityInfo.encryptionValue")}</dd>
+          <dd class={styles.value}>
+            {t("settings.securityInfo.encryptionValue")}
+            <code class={styles.tech}>{t("settings.securityInfo.encryptionTech")}</code>
+          </dd>
         </div>
         <div class={styles.infoRow}>
           <dt class={styles.label}>{t("settings.securityInfo.kdfLabel")}</dt>
-          <dd class={styles.value}>{t("settings.securityInfo.kdfValue")}</dd>
+          <dd class={styles.value}>
+            {t("settings.securityInfo.kdfValue")}
+            <code class={styles.tech}>{t("settings.securityInfo.kdfTech")}</code>
+          </dd>
         </div>
         <div class={styles.infoRow}>
           <dt class={styles.label}>{t("settings.securityInfo.kemLabel")}</dt>
-          <dd class={styles.value}>{t("settings.securityInfo.kemValue")}</dd>
+          <dd class={styles.value}>
+            {t("settings.securityInfo.kemValue")}
+            <code class={styles.tech}>{t("settings.securityInfo.kemTech")}</code>
+          </dd>
         </div>
       </dl>
 

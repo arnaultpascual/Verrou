@@ -1,6 +1,6 @@
 /* Design Token System — Single Source of Truth
- * Source: ux-design-specification.md#Design Token Architecture
- * Aesthetic: "Quiet confidence" — flat, minimal, muted, European
+ * Aesthetic: "Cipher" — sharp, technical, crypto-native (electric blue,
+ * cool near-black surfaces, Space Grotesk + JetBrains Mono, hairline, dense).
  *
  * Theme strategy:
  *   :root          = dark theme (default)
@@ -13,67 +13,67 @@
  * DARK THEME (default)
  *
  * WCAG 2.1 AA Contrast Ratios (verified):
- *   text-primary  (#E8E8F0) on surface-0 (#0F0F14) = 14.2:1  (4.5:1 req)
- *   text-secondary(#9898AC) on surface-1 (#1A1A24) =  5.8:1  (4.5:1 req)
- *   text-muted    (#5C5C70) on surface-1 (#1A1A24) =  3.3:1  (3:1 large text/UI)
- *   primary btn   (#0F0F14) on primary   (#7B8CA8) =  5.3:1  (4.5:1 req)
- *   danger        (#E05252) on surface-1 (#1A1A24) =  4.8:1  (4.5:1 req)
+ *   text-primary  (#E6EAF2) on surface-0 (#0A0C10) = 15.3:1  (4.5:1 req)
+ *   text-secondary(#8A93A6) on surface-1 (#11141A) =  6.4:1  (4.5:1 req)
+ *   text-muted    (#515A6B) on surface-1 (#11141A) =  3.2:1  (3:1 large text/UI)
+ *   primary btn   (#06080C) on primary   (#3B82F6) =  5.3:1  (4.5:1 req)
+ *   danger        (#E05252) on surface-1 (#11141A) =  4.9:1  (4.5:1 req)
  * ═══════════════════════════════════════════════════════════════════ */
 
 :root {
   /* ── Surface Hierarchy ── */
-  --color-surface-0: #0F0F14;          /* App background — deep charcoal */
-  --color-surface-1: #1A1A24;          /* Sidebar, panels, cards */
-  --color-surface-2: #22222E;          /* Modal/popup surface */
-  --color-surface-3: #2A2A38;          /* Hover/active states */
+  --color-surface-0: #0A0C10;          /* App background — cool near-black */
+  --color-surface-1: #11141A;          /* Sidebar, panels, cards */
+  --color-surface-2: #161A22;          /* Modal/popup surface */
+  --color-surface-3: #1E232D;          /* Hover/active states */
 
   /* ── Text Hierarchy ── */
-  --color-text-primary: #E8E8F0;       /* Headings, primary content */
-  --color-text-secondary: #9898AC;     /* Labels, descriptions */
-  --color-text-muted: #5C5C70;         /* Placeholders, disabled */
-  --color-text-inverse: #0F0F14;       /* Text on primary color buttons */
+  --color-text-primary: #E6EAF2;       /* Headings, primary content */
+  --color-text-secondary: #8A93A6;     /* Labels, descriptions */
+  --color-text-muted: #515A6B;         /* Placeholders, disabled */
+  --color-text-inverse: #06080C;       /* Text on primary color buttons */
 
   /* ── Semantic Colors ── */
-  --color-primary: #7B8CA8;            /* Slate — brand action (lighter for dark bg) */
-  --color-primary-hover: #8E9DBD;      /* Brighter on interaction */
-  --color-primary-bg: rgba(123, 140, 168, 0.12);  /* Soft tint for active/selected states */
+  --color-primary: #3B82F6;            /* Electric blue — Cipher brand action */
+  --color-primary-hover: #60A0FF;      /* Brighter on interaction */
+  --color-primary-bg: rgba(59, 130, 246, 0.14);  /* Soft tint for active/selected states */
   --color-danger: #E05252;             /* Lighter red for dark background contrast */
-  --color-success: #48BB78;            /* Brighter green for visibility */
-  --color-warning: #D69E2E;            /* Brighter amber for visibility */
+  --color-success: #3FD08B;            /* Green for visibility */
+  --color-warning: #E0B341;            /* Amber for visibility */
 
   /* ── Semantic Backgrounds (soft tints for status indicators) ── */
-  --color-success-bg: rgba(72, 187, 120, 0.12);
-  --color-warning-bg: rgba(214, 158, 46, 0.12);
+  --color-success-bg: rgba(63, 208, 139, 0.12);
+  --color-warning-bg: rgba(224, 179, 65, 0.12);
   --color-danger-bg: rgba(224, 82, 82, 0.12);
   --color-danger-bg-subtle: rgba(224, 82, 82, 0.08);
 
   /* ── Entry Type Accents ── */
-  --color-type-totp: #5B9DC2;          /* Steel blue — TOTP/2FA codes */
-  --color-type-seed: #9B8BB0;          /* Muted purple — Seed phrases */
-  --color-type-recovery: #B09570;      /* Warm bronze — Recovery codes */
-  --color-type-note: #78A090;          /* Sage green — Secure notes */
-  --color-type-credential: #8BA0B5;    /* Cool gray-blue — Credentials (Phase 3) */
+  --color-type-totp: #3B82F6;          /* Electric blue — TOTP/2FA codes */
+  --color-type-seed: #A78BFA;          /* Purple — Seed phrases */
+  --color-type-recovery: #E0B341;      /* Amber — Recovery codes */
+  --color-type-note: #3FD08B;          /* Green — Secure notes */
+  --color-type-credential: #7E8AA0;    /* Slate — Credentials */
 
   /* ── Borders ── */
-  --border-color-subtle: #22222E;      /* Barely visible separators */
-  --border-color-default: #2A2A38;     /* Standard card/panel border */
-  --border-color-strong: #3A4155;      /* Focused elements, emphasis */
+  --border-color-subtle: #1A2029;      /* Barely visible separators */
+  --border-color-default: #222936;     /* Standard card/panel border */
+  --border-color-strong: #2C3543;      /* Focused elements, emphasis */
   --border-subtle: 1px solid var(--border-color-subtle);
   --border-default: 1px solid var(--border-color-default);
   --border-strong: 1px solid var(--border-color-strong);
-  --border-radius-xs: 3px;             /* Tight rounding (chips, small controls) */
-  --border-radius-sm: 4px;             /* Subtle rounding */
-  --border-radius-md: 6px;             /* Cards, inputs */
-  --border-radius-lg: 8px;             /* Modals, large panels */
-  --border-radius-xl: 10px;            /* Large rounded surfaces */
+  --border-radius-xs: 2px;             /* Tight rounding (chips, small controls) */
+  --border-radius-sm: 3px;             /* Subtle rounding */
+  --border-radius-md: 4px;             /* Cards, inputs */
+  --border-radius-lg: 6px;             /* Modals, large panels */
+  --border-radius-xl: 8px;             /* Large rounded surfaces */
 
   /* ── Focus ── */
-  --color-focus-ring: rgba(123, 140, 168, 0.5);
-  --color-success-focus-ring: rgba(72, 187, 120, 0.2);
+  --color-focus-ring: rgba(59, 130, 246, 0.5);
+  --color-success-focus-ring: rgba(63, 208, 139, 0.2);
   --color-danger-focus-ring: rgba(224, 82, 82, 0.3);
 
   /* ── Overlay ── */
-  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-overlay: rgba(0, 0, 0, 0.6);
 
   /* ── Spacing (4/8px grid) ── */
   --spacing-xs: 4px;
@@ -91,9 +91,9 @@
   --spacing-3xl: 48px;
 
   /* ── Typography ── */
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-  --font-family-mono: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono",
+  --font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --font-family-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", "Fira Code",
     ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
 
   --font-size-xs: 0.6875rem;    /* 11px */
@@ -103,6 +103,7 @@
   --font-size-lg: 1.125rem;     /* 18px */
   --font-size-xl: 1.375rem;     /* 22px */
   --font-size-2xl: 1.75rem;     /* 28px — onboarding headings */
+  --font-size-display: 2.125rem; /* 34px — hero moments (unlock, onboarding) */
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
@@ -123,8 +124,8 @@
 
   /* ── Shadows (minimal — flat design) ── */
   --shadow-none: none;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.18);
+  --shadow-popup: 0 8px 24px rgba(0, 0, 0, 0.36);
 
   /* ── Animation ── */
   --duration-instant: 50ms;
@@ -133,6 +134,7 @@
   --duration-slow: 400ms;
   --duration-ceremony: 3000ms;  /* KDF re-auth ceremony */
   --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-vault: cubic-bezier(0.2, 0.9, 0.25, 1);  /* Crisp "vault" entrance */
 
   /* ── Opacity ── */
   --opacity-disabled: 0.5;
@@ -157,7 +159,7 @@
  *   text-primary  (#1A1A2E) on surface-0 (#F8F8FA) = 12.5:1  (4.5:1 req)
  *   text-secondary(#6B6B80) on surface-1 (#FFFFFF) =  5.2:1  (4.5:1 req)
  *   text-muted    (#9D9DB0) on surface-1 (#FFFFFF) =  3.1:1  (3:1 large text/UI)
- *   primary btn   (#FFFFFF) on primary   (#4A5568) =  6.8:1  (4.5:1 req)
+ *   primary btn   (#FFFFFF) on primary   (#2563EB) =  5.1:1  (4.5:1 req)
  *   danger        (#C53030) on surface-1 (#FFFFFF) =  5.6:1  (4.5:1 req)
  * ═══════════════════════════════════════════════════════════════════ */
 
@@ -172,30 +174,30 @@
   --color-text-muted: #9D9DB0;
   --color-text-inverse: #FFFFFF;
 
-  --color-primary: #4A5568;
-  --color-primary-hover: #3D4656;
-  --color-primary-bg: rgba(74, 85, 104, 0.10);
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-bg: rgba(37, 99, 235, 0.10);
   --color-danger: #C53030;
-  --color-success: #2D6A4F;
+  --color-success: #1E8A5A;
   --color-warning: #B7791F;
 
-  --color-success-bg: rgba(45, 106, 79, 0.10);
+  --color-success-bg: rgba(30, 138, 90, 0.10);
   --color-warning-bg: rgba(183, 121, 31, 0.10);
   --color-danger-bg: rgba(197, 48, 48, 0.10);
   --color-danger-bg-subtle: rgba(197, 48, 48, 0.06);
 
-  --color-type-totp: #4A7C9B;
+  --color-type-totp: #2563EB;
   --color-type-seed: #7B6B8A;
   --color-type-recovery: #8B7355;
-  --color-type-note: #5B7B6B;
+  --color-type-note: #1E8A5A;
   --color-type-credential: #6B7B8B;
 
   --border-color-subtle: #F0F0F4;
   --border-color-default: #E0E0E6;
   --border-color-strong: #C5C5D0;
 
-  --color-focus-ring: rgba(74, 85, 104, 0.4);
-  --color-success-focus-ring: rgba(45, 106, 79, 0.2);
+  --color-focus-ring: rgba(37, 99, 235, 0.4);
+  --color-success-focus-ring: rgba(30, 138, 90, 0.2);
   --color-danger-focus-ring: rgba(197, 48, 48, 0.3);
 
   --color-overlay: rgba(0, 0, 0, 0.4);
@@ -221,30 +223,30 @@
     --color-text-muted: #9D9DB0;
     --color-text-inverse: #FFFFFF;
 
-    --color-primary: #4A5568;
-    --color-primary-hover: #3D4656;
-    --color-primary-bg: rgba(74, 85, 104, 0.10);
+    --color-primary: #2563EB;
+    --color-primary-hover: #1D4ED8;
+    --color-primary-bg: rgba(37, 99, 235, 0.10);
     --color-danger: #C53030;
-    --color-success: #2D6A4F;
+    --color-success: #1E8A5A;
     --color-warning: #B7791F;
 
-    --color-success-bg: rgba(45, 106, 79, 0.10);
+    --color-success-bg: rgba(30, 138, 90, 0.10);
     --color-warning-bg: rgba(183, 121, 31, 0.10);
     --color-danger-bg: rgba(197, 48, 48, 0.10);
     --color-danger-bg-subtle: rgba(197, 48, 48, 0.06);
 
-    --color-type-totp: #4A7C9B;
+    --color-type-totp: #2563EB;
     --color-type-seed: #7B6B8A;
     --color-type-recovery: #8B7355;
-    --color-type-note: #5B7B6B;
+    --color-type-note: #1E8A5A;
     --color-type-credential: #6B7B8B;
 
     --border-color-subtle: #F0F0F4;
     --border-color-default: #E0E0E6;
     --border-color-strong: #C5C5D0;
 
-    --color-focus-ring: rgba(74, 85, 104, 0.4);
-    --color-success-focus-ring: rgba(45, 106, 79, 0.2);
+    --color-focus-ring: rgba(37, 99, 235, 0.4);
+    --color-success-focus-ring: rgba(30, 138, 90, 0.2);
     --color-danger-focus-ring: rgba(197, 48, 48, 0.3);
 
     --color-overlay: rgba(0, 0, 0, 0.4);

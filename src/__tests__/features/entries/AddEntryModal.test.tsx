@@ -1,6 +1,7 @@
 import { render, fireEvent, waitFor } from "@solidjs/testing-library";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { AddEntryModal } from "../../../features/entries/AddEntryModal";
+import * as ipc from "../../../features/entries/ipc";
 import { _resetMockStore } from "../../../features/entries/ipc";
 
 // Mock useToast
@@ -369,6 +370,150 @@ describe("AddEntryModal", () => {
         );
         expect(scanBtn).toBeFalsy();
       });
+    });
+  });
+
+  describe("HOTP creation (type toggle)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** Open the form in manual mode and return the modal root. */
+    async function openManualForm() {
+      const manualBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Enter manually"),
+      );
+      fireEvent.click(manualBtn!);
+      await waitFor(() => {
+        expect(
+          Array.from(document.querySelectorAll("label")).some(
+            (l) => l.textContent === "Account Name",
+          ),
+        ).toBe(true);
+      });
+    }
+
+    const totpToggle = () =>
+      document.querySelector("[data-testid='type-toggle-totp']") as HTMLElement;
+    const hotpToggle = () =>
+      document.querySelector("[data-testid='type-toggle-hotp']") as HTMLElement;
+
+    it("renders a TOTP/HOTP type toggle, defaulting to TOTP", async () => {
+      renderModal();
+      await openManualForm();
+      expect(totpToggle()).toBeTruthy();
+      expect(hotpToggle()).toBeTruthy();
+      expect(totpToggle().getAttribute("aria-checked")).toBe("true");
+      expect(hotpToggle().getAttribute("aria-checked")).toBe("false");
+    });
+
+    it("shows an initial Counter field and hides the time-based Period field when HOTP is selected", async () => {
+      renderModal();
+      await openManualForm();
+
+      // TOTP default: open Advanced → Period select is present, no Counter field.
+      const advancedBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Advanced settings"),
+      );
+      fireEvent.click(advancedBtn!);
+      await waitFor(() => {
+        expect(document.querySelector("#select-period")).toBeTruthy();
+      });
+      expect(
+        Array.from(document.querySelectorAll("label")).some(
+          (l) => l.textContent === "Initial counter",
+        ),
+      ).toBe(false);
+
+      // Switch to HOTP: Counter field appears, Period select disappears.
+      fireEvent.click(hotpToggle());
+      await waitFor(() => {
+        expect(
+          Array.from(document.querySelectorAll("label")).some(
+            (l) => l.textContent === "Initial counter",
+          ),
+        ).toBe(true);
+        expect(document.querySelector("#select-period")).toBeNull();
+      });
+
+      // Algorithm and digits remain available for HOTP.
+      expect(document.querySelector("#select-algorithm")).toBeTruthy();
+      expect(document.querySelector("#select-digits")).toBeTruthy();
+    });
+
+    it("creates an HOTP entry with the chosen initial counter (and no period)", async () => {
+      const addSpy = vi.spyOn(ipc, "addEntry");
+      const onSuccess = vi.fn();
+      renderModal({ onSuccess });
+      await openManualForm();
+
+      // Select HOTP.
+      fireEvent.click(hotpToggle());
+
+      // Fill name.
+      const nameInput = Array.from(document.querySelectorAll("input")).find(
+        (i) => i.placeholder === "e.g. GitHub",
+      ) as HTMLInputElement;
+      fireEvent.input(nameInput, { target: { value: "Legacy VPN" } });
+
+      // Fill secret.
+      const secretInput = Array.from(document.querySelectorAll("input")).find(
+        (i) => i.placeholder === "Base32 encoded key",
+      ) as HTMLInputElement;
+      fireEvent.input(secretInput, { target: { value: "JBSWY3DPEHPK3PXP" } });
+
+      // Set the initial counter to 7.
+      const counterInput = Array.from(document.querySelectorAll("input")).find(
+        (i) => i.type === "number",
+      ) as HTMLInputElement;
+      expect(counterInput).toBeTruthy();
+      fireEvent.input(counterInput, { target: { value: "7" } });
+
+      const saveBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Save Entry"),
+      );
+      fireEvent.click(saveBtn!);
+
+      await waitFor(() => {
+        expect(addSpy).toHaveBeenCalledTimes(1);
+      });
+      const req = addSpy.mock.calls[0][0];
+      expect(req.entryType).toBe("hotp");
+      expect(req.counter).toBe(7);
+      expect(req.period).toBeUndefined();
+      expect(req.secret).toBe("JBSWY3DPEHPK3PXP");
+      await waitFor(() => {
+        expect(onSuccess).toHaveBeenCalled();
+      });
+    });
+
+    it("creates a TOTP entry (period sent, counter omitted) when the toggle stays on TOTP", async () => {
+      const addSpy = vi.spyOn(ipc, "addEntry");
+      renderModal();
+      await openManualForm();
+
+      const nameInput = Array.from(document.querySelectorAll("input")).find(
+        (i) => i.placeholder === "e.g. GitHub",
+      ) as HTMLInputElement;
+      fireEvent.input(nameInput, { target: { value: "GitHub" } });
+
+      const secretInput = Array.from(document.querySelectorAll("input")).find(
+        (i) => i.placeholder === "Base32 encoded key",
+      ) as HTMLInputElement;
+      fireEvent.input(secretInput, { target: { value: "JBSWY3DPEHPK3PXP" } });
+
+      const saveBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Save Entry"),
+      );
+      fireEvent.click(saveBtn!);
+
+      await waitFor(() => {
+        expect(addSpy).toHaveBeenCalledTimes(1);
+      });
+      const req = addSpy.mock.calls[0][0];
+      expect(req.entryType).toBe("totp");
+      expect(req.period).toBe(30);
+      expect(req.counter).toBeUndefined();
     });
   });
 });

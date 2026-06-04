@@ -62,9 +62,24 @@
   },
   "settings": {
     "title": "Settings",
+    "groups": {
+      "security": "Security",
+      "appearance": "Appearance",
+      "backupTransfer": "Backup & Transfer",
+      "about": "About"
+    },
+    "clipboardClear": {
+      "label": "Clear clipboard after",
+      "hint": "Copied codes are wiped from the clipboard once this time passes.",
+      "ariaLabel": "Clear copied codes from the clipboard after",
+      "option10s": "10 seconds",
+      "option30s": "30 seconds",
+      "option1m": "1 minute",
+      "option2m": "2 minutes"
+    },
     "preferences": "Preferences",
     "security": "Security",
-    "securityDescription": "Change your master password. Your vault entries will not be re-encrypted — only the password slot is updated.",
+    "securityDescription": "Change your master password. Your saved entries stay encrypted — only your sign-in is updated.",
     "changePasswordButton": "Change Master Password",
     "keyboardShortcuts": "Keyboard Shortcuts",
     "importSection": "Import",
@@ -80,7 +95,7 @@
     "sendEntriesButton": "Send Entries",
     "receiveEntriesButton": "Receive Entries",
     "clipboard": "Clipboard",
-    "clipboardDescription": "Copied codes are automatically cleared from the clipboard after the configured timeout.",
+    "clipboardDescription": "Copied codes are automatically cleared from the clipboard after the time you set above.",
     "clipboardInfo": "Some clipboard managers may retain copied codes. VERROU uses platform features to prevent this where possible.",
     "dangerZone": "Danger Zone",
     "deleteVaultDescription": "Permanently delete your vault and all its contents. This action cannot be undone.",
@@ -204,7 +219,8 @@
     "hardware": {
       "title": "Hardware Security",
       "checking": "Checking hardware security...",
-      "unavailable": "Hardware security (Secure Enclave/TPM) is not available on this device. Your vault key is protected by software encryption only.",
+      "unavailable": "This device has no security chip. Your vault key is protected by software encryption only.",
+      "unavailableHint": "A security chip (Secure Enclave / TPM) would add hardware-backed protection.",
       "activeStatus": "{{provider}} active",
       "availableStatus": "{{provider}} available"
     },
@@ -222,11 +238,14 @@
       "title": "Vault Security",
       "summary": "Your data is encrypted and stored only on this device.",
       "encryptionLabel": "Encryption",
-      "encryptionValue": "AES-256-GCM (authenticated)",
-      "kdfLabel": "Key derivation",
-      "kdfValue": "Argon2id (memory-hard)",
+      "encryptionValue": "Authenticated",
+      "encryptionTech": "AES-256-GCM",
+      "kdfLabel": "Password protection",
+      "kdfValue": "Memory-hard",
+      "kdfTech": "Argon2id",
       "kemLabel": "Key exchange",
-      "kemValue": "X25519 + ML-KEM-1024 (hybrid post-quantum)",
+      "kemValue": "Hybrid post-quantum",
+      "kemTech": "X25519 + ML-KEM-1024",
       "learnMore": "Learn more",
       "learnLess": "Show less",
       "detailAes": "AES-256-GCM: 256-bit symmetric encryption with authentication tag. Ensures both confidentiality and integrity of your data.",
@@ -315,6 +334,14 @@
     "searchResultCount": "{{count}} entries found",
     "empty": "Your vault is empty. Add your first entry or import from another app.",
     "emptySearch": "No entries match '{{query}}'",
+    "clearSearch": "Clear search",
+    "filter": {
+      "activeLabel": "Filtered by",
+      "folderChip": "Folder: {{name}}",
+      "clearFolder": "Clear folder filter",
+      "clearType": "Clear type filter",
+      "resultCount": "Showing {{shown}} of {{total}}"
+    },
     "loading": "Loading entries...",
     "error": "Failed to load entries.",
     "sort": {
@@ -359,7 +386,13 @@
       "success": "{{name}} added to vault",
       "error": "Failed to add entry. Please try again.",
       "base32Error": "Secret must be valid Base32 (A-Z, 2-7).",
-      "comingSoon": "Coming soon"
+      "comingSoon": "Coming soon",
+      "typeLabel": "Code type",
+      "typeTotp": "Time-based (TOTP)",
+      "typeHotp": "Counter-based (HOTP)",
+      "counterLabel": "Initial counter",
+      "counterPlaceholder": "0",
+      "counterHint": "HOTP codes advance by counter, not time. Start at 0 unless your provider gave you a different value."
     },
     "edit": {
       "title": "Edit Entry",
@@ -410,7 +443,10 @@
       "clickToView": "Click to view",
       "templateSshKey": "SSH Key",
       "templateLicense": "License",
-      "templateIdentity": "Identity"
+      "templateIdentity": "Identity",
+      "generate": "Generate",
+      "regenerate": "Generate next code",
+      "counterValue": "Counter {{counter}}"
     },
     "type": {
       "totp": "TOTP",
@@ -431,7 +467,29 @@
       "uriCopied": "URI copied to clipboard",
       "uriCopyError": "Failed to copy URI",
       "qrLabel": "Scan with authenticator app"
+    },
+    "totpDetail": {
+      "title": "Code Details",
+      "copyHint": "Click to copy code",
+      "algorithm": "Algorithm",
+      "digits": "Digits",
+      "period": "Period",
+      "periodSeconds": "{{seconds}}s",
+      "added": "Added",
+      "generateHotp": "Generate next code",
+      "counterValue": "Counter {{counter}}",
+      "edit": "Edit",
+      "export": "Export",
+      "delete": "Delete",
+      "close": "Close"
     }
+  },
+  "reveal": {
+    "copied": "{{label}} copied · clears in {{seconds}}s",
+    "copyFailed": "Could not copy {{label}}",
+    "hidingIn": "Hiding in {{seconds}}s",
+    "hidingInClock": "Hiding in {{time}}",
+    "hide": "Hide"
   },
   "credentials": {
     "templates": {
@@ -802,6 +860,7 @@
       "reveal": "Reveal",
       "timer": "Hiding in {{remaining}}s",
       "copyAll": "Copy All",
+      "copyAllLabel": "Seed phrase",
       "copyAllSuccess": "Seed phrase in clipboard — clears in 30s",
       "copyAllError": "Failed to copy seed phrase",
       "hide": "Hide",
@@ -1046,6 +1105,14 @@
       "recovery": "Recovery",
       "import": "Import"
     },
+    "welcome": {
+      "heading": "Your vault, and only yours",
+      "subheading": "Verrou keeps your 2FA codes, recovery phrases, and passwords encrypted on this device. Nothing ever leaves it.",
+      "offline": "Offline by design — no servers, ever",
+      "noAccounts": "No account, no email, no tracking",
+      "postQuantum": "Post-quantum encryption built in",
+      "cta": "Get started"
+    },
     "password": {
       "heading": "Create your password",
       "description": "Choose a strong master password to protect your vault. This is the only password you'll need to remember.",
@@ -1079,7 +1146,9 @@
         "timing": "~4 seconds"
       },
       "ariaLabel": "Security level selection",
-      "recommended": "(Recommended)"
+      "recommended": "(Recommended)",
+      "measuring": "Measuring your device…",
+      "calibrated": "{{memory}} MB memory · {{passes}} passes"
     },
     "recoveryKey": {
       "headingCreating": "Creating your vault",
@@ -1108,10 +1177,16 @@
       "print": "Print",
       "toastCopied": "Recovery key copied",
       "toastCopyFailed": "Failed to copy",
-      "toastFailed": "Failed to create vault"
+      "toastFailed": "Failed to create vault",
+      "encrypting": "Encrypting your vault…",
+      "encryptingHint": "This runs the encryption on your device — it can take a few seconds.",
+      "shownOnce": "Your recovery key is shown once. Without it (and your password), your vault can't be recovered.",
+      "confirmReentry": "Re-enter your recovery key to confirm you've saved it",
+      "confirmPlaceholder": "Type your recovery key",
+      "confirmMismatch": "That doesn't match your key yet."
     },
     "import": {
-      "heading": "Import Existing Entries",
+      "heading": "Import existing entries",
       "description": "Optionally import 2FA codes from other apps now, or skip and add entries later.",
       "importButton": "Import now",
       "skipButton": "Skip for now",
@@ -1290,7 +1365,11 @@
       "entries": "Entries",
       "folders": "Folders",
       "submitButton": "Export Vault",
-      "toastSuccess": "Vault exported to {{filename}}"
+      "toastSuccess": "Vault exported to {{filename}}",
+      "chooseLocationButton": "Choose where to save…",
+      "savingTo": "Saving to {{filename}}",
+      "changeLocation": "Change",
+      "trust": "Your export is encrypted with your master password — keep both somewhere safe."
     },
     "paperBackup": {
       "title": "Paper Backup",
@@ -1301,7 +1380,20 @@
       "generateButton": "Generate Backup",
       "warningPreview": "This document contains your unencrypted seed phrases. Store it in a secure physical location.",
       "retryButton": "Try Again",
-      "printButton": "Print"
+      "printButton": "Print",
+      "doc": {
+        "confidential": "CONFIDENTIAL",
+        "title": "VERROU Paper Backup",
+        "generated": "Generated: {{date}}",
+        "fingerprint": "Vault Fingerprint: {{fingerprint}}",
+        "empty": "No seed phrases or recovery codes found in this vault.",
+        "seedsTitle": "Seed Phrases",
+        "passphraseNote": "Passphrase protected (25th word not included in this backup)",
+        "recoveryTitle": "Recovery Codes",
+        "remaining": "{{remaining}} of {{total}} remaining",
+        "checksumLabel": "Content Checksum (BLAKE3): ",
+        "storeWarning": "Store this document in a secure physical location. Do NOT photograph or digitize this backup."
+      }
     },
     "qrTransfer": {
       "send": {
@@ -1333,11 +1425,14 @@
         "sensitiveWarning": "Your selection includes seed phrases or recovery codes. Re-authentication is required.",
         "toastFileFailed": "Failed to save transfer file",
         "toastFileSaved": "Transfer file saved",
-        "verificationPrompt": "Verification code — enter this on the receiving device:"
+        "verificationPrompt": "Verification code — enter this on the receiving device:",
+        "crossDeviceHint": "On your other device, open Verrou → Settings → Backup & Transfer → Receive via QR, enter this code, then point its camera at this screen."
       },
       "receive": {
         "title": "Receive Transfer",
         "codeDescription": "Enter the 4-word verification code displayed on the sending device.",
+        "crossDeviceHint": "Receiving from another device: on it, open Verrou → Settings → Backup & Transfer → Send via QR. Enter the 4-word code it shows below, then scan its QR codes.",
+        "scanHint": "Point your camera at the other device's screen — codes are captured automatically.",
         "codePlaceholder": "word word word word",
         "codeHint": "4 words separated by spaces",
         "loadFileButton": "Load from File",
@@ -1376,10 +1471,12 @@
     "noMatching": "No matching entries",
     "noEntries": "No entries in vault",
     "hintsNavigate": "↑↓ navigate",
-    "hintsCopy": "⏎ copy code/username",
+    "hintsCopy": "⏎ copy",
     "hintsClose": "esc close",
     "copyUsername": "{{name}} username copied",
     "copyCode": "{{name}} copied",
+    "copyCodeCleared": "{{name}} copied · clears in {{seconds}}s",
+    "copyUsernameCleared": "{{name}} username copied · clears in {{seconds}}s",
     "copyUsernameError": "Could not copy username",
     "copyCodeError": "Could not copy code",
     "openVaultInfo": "Open vault to copy password",
@@ -1397,7 +1494,7 @@
     "copyCodeFailed": "Could not copy code",
     "copyUsernameFailed": "Could not copy username",
     "hintClose": "esc close",
-    "hintCopy": "⏎ copy code/username",
+    "hintCopy": "⏎ copy",
     "hintNavigate": "↑↓ navigate",
     "openVaultToCopy": "Open vault to copy password",
     "passwordLabel": "Master Password",
@@ -1423,6 +1520,8 @@
       "codeCopied": "Code copied",
       "openMainVault": "Open the main vault to view this entry",
       "copyCode": "Copy code",
+      "generateCode": "Generate & copy next code",
+      "counterValue": "Counter {{counter}}",
       "revealError": "Incorrect password",
       "hintsBack": "back",
       "hintsOpen": "open",
@@ -1464,7 +1563,24 @@
     "scoreAtRisk": "At risk",
     "scoreAttention": "Needs attention",
     "toastAnalyzing": "Analyzing password health...",
-    "weakPasswords": "Weak Passwords"
+    "weakPasswords": "Weak Passwords",
+    "scoreExplainerToggle": "How is this scored?",
+    "scoreExplainer": "We check each login for three things: a reused password, a weak password, and one that hasn't changed in a long time. Your score is the share of those checks that pass. Two-factor coverage is tracked separately below and doesn't affect this score.",
+    "fix": "Fix",
+    "fixAria": "Fix the password for {{name}}",
+    "strengthWeak": "Weak",
+    "strengthFair": "Fair",
+    "ageOverYears": "over {{years}} years ago",
+    "ageOverYear": "over a year ago",
+    "ageOverSixMonths": "over 6 months ago",
+    "ageMonths": "{{count}} months ago",
+    "reusedSharedWith": "shared with {{count}} more",
+    "coverageTitle": "Two-factor coverage",
+    "coverageSummary": "{{count}} of {{total}} have no 2FA",
+    "coverageHint": "Two-factor adds a second step at sign-in. It strengthens an account but isn't a password problem, so it doesn't affect your score.",
+    "addTwoFactor": "Add 2FA",
+    "addTwoFactorAria": "Add two-factor for {{name}}",
+    "passwordsAllStrong": "Every password is strong and unique."
   },
   "folders": {
     "allEntries": "All Entries",
@@ -1478,7 +1594,16 @@
     "confirmDelete": "Delete folder \"{{name}}\"? Entries inside won't be deleted.",
     "createError": "Failed to create folder.",
     "renameError": "Failed to rename folder.",
-    "deleteError": "Failed to delete folder."
+    "deleteError": "Failed to delete folder.",
+    "moveError": "Failed to move folder.",
+    "newSubfolder": "New subfolder",
+    "newSubfolderAria": "Add a subfolder to {{name}}",
+    "moveUp": "Move up",
+    "moveUpAria": "Move {{name}} up",
+    "moveDown": "Move down",
+    "moveDownAria": "Move {{name}} down",
+    "expandAria": "Expand {{name}}",
+    "collapseAria": "Collapse {{name}}"
   },
   "attachments": {
     "title": "Attachments",

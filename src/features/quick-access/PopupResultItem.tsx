@@ -17,7 +17,9 @@ export interface PopupResultItemProps {
 /**
  * Single entry row in the popup result list.
  * Shows type badge, name, issuer, and pin toggle.
- * Click/Enter opens the detail view.
+ * Click/Enter triggers the row's primary action (`onSelect`): copyable results
+ * (TOTP/HOTP codes, credential usernames) copy directly; everything else opens
+ * the detail view. The row itself stays display-only — no secrets are rendered.
  */
 export const PopupResultItem: Component<PopupResultItemProps> = (props) => {
   return (

@@ -20,6 +20,15 @@ export interface TagInputProps {
 
 export const TagInput: Component<TagInputProps> = (props) => {
   const [inputValue, setInputValue] = createSignal("");
+  let inputRef: HTMLInputElement | undefined;
+
+  // Focus the input when the container (cursor: text) is clicked, unless the
+  // click landed on an interactive child (e.g. a chip remove button).
+  const focusInput = (e: MouseEvent) => {
+    if (props.disabled) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    inputRef?.focus();
+  };
 
   const addTag = (raw: string) => {
     const tag = raw.trim().toLowerCase();
@@ -62,7 +71,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
 
   return (
     <div class={styles.wrapper}>
-      <div class={styles.container}>
+      <div class={styles.container} onClick={focusInput}>
         <For each={props.tags}>
           {(tag, index) => (
             <span class={styles.chip}>
@@ -80,6 +89,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
           )}
         </For>
         <input
+          ref={inputRef}
           class={styles.input}
           type="text"
           value={inputValue()}

@@ -62,9 +62,24 @@
   },
   "settings": {
     "title": "Paramètres",
+    "groups": {
+      "security": "Sécurité",
+      "appearance": "Apparence",
+      "backupTransfer": "Sauvegarde et transfert",
+      "about": "À propos"
+    },
+    "clipboardClear": {
+      "label": "Effacer le presse-papiers après",
+      "hint": "Les codes copiés sont effacés du presse-papiers une fois ce délai écoulé.",
+      "ariaLabel": "Effacer les codes copiés du presse-papiers après",
+      "option10s": "10 secondes",
+      "option30s": "30 secondes",
+      "option1m": "1 minute",
+      "option2m": "2 minutes"
+    },
     "preferences": "Préférences",
     "security": "Sécurité",
-    "securityDescription": "Modifiez votre mot de passe maître. Vos entrées ne seront pas rechiffrées — seul le créneau de mot de passe est mis à jour.",
+    "securityDescription": "Modifiez votre mot de passe maître. Vos entrées enregistrées restent chiffrées — seule votre connexion est mise à jour.",
     "changePasswordButton": "Modifier le mot de passe maître",
     "keyboardShortcuts": "Raccourcis clavier",
     "importSection": "Importation",
@@ -80,7 +95,7 @@
     "sendEntriesButton": "Envoyer des entrées",
     "receiveEntriesButton": "Recevoir des entrées",
     "clipboard": "Presse-papiers",
-    "clipboardDescription": "Les codes copiés sont automatiquement effacés du presse-papiers après le délai configuré.",
+    "clipboardDescription": "Les codes copiés sont automatiquement effacés du presse-papiers après le délai défini ci-dessus.",
     "clipboardInfo": "Certains gestionnaires de presse-papiers peuvent conserver les codes copiés. VERROU utilise les fonctionnalités de la plateforme pour empêcher cela dans la mesure du possible.",
     "dangerZone": "Zone de danger",
     "deleteVaultDescription": "Supprimez définitivement votre coffre et tout son contenu. Cette action est irréversible.",
@@ -204,7 +219,8 @@
     "hardware": {
       "title": "Sécurité matérielle",
       "checking": "Vérification de la sécurité matérielle…",
-      "unavailable": "La sécurité matérielle (Secure Enclave/TPM) n'est pas disponible sur cet appareil. Votre clé de coffre est protégée uniquement par chiffrement logiciel.",
+      "unavailable": "Cet appareil n'a pas de puce de sécurité. Votre clé de coffre est protégée uniquement par chiffrement logiciel.",
+      "unavailableHint": "Une puce de sécurité (Secure Enclave / TPM) ajouterait une protection matérielle.",
       "activeStatus": "{{provider}} actif",
       "availableStatus": "{{provider}} disponible"
     },
@@ -222,11 +238,14 @@
       "title": "Sécurité du coffre",
       "summary": "Vos données sont chiffrées et stockées uniquement sur cet appareil.",
       "encryptionLabel": "Chiffrement",
-      "encryptionValue": "AES-256-GCM (authentifié)",
-      "kdfLabel": "Dérivation de clé",
-      "kdfValue": "Argon2id (résistant en mémoire)",
+      "encryptionValue": "Authentifié",
+      "encryptionTech": "AES-256-GCM",
+      "kdfLabel": "Protection du mot de passe",
+      "kdfValue": "Résistant en mémoire",
+      "kdfTech": "Argon2id",
       "kemLabel": "Échange de clés",
-      "kemValue": "X25519 + ML-KEM-1024 (hybride post-quantique)",
+      "kemValue": "Hybride post-quantique",
+      "kemTech": "X25519 + ML-KEM-1024",
       "learnMore": "En savoir plus",
       "learnLess": "Réduire",
       "detailAes": "AES-256-GCM : chiffrement symétrique 256 bits avec tag d'authentification. Assure la confidentialité et l'intégrité de vos données.",
@@ -315,6 +334,14 @@
     "searchResultCount": "{{count}} entrées trouvées",
     "empty": "Votre coffre est vide. Ajoutez votre première entrée ou importez depuis une autre application.",
     "emptySearch": "Aucune entrée ne correspond à « {{query}} »",
+    "clearSearch": "Effacer la recherche",
+    "filter": {
+      "activeLabel": "Filtré par",
+      "folderChip": "Dossier : {{name}}",
+      "clearFolder": "Retirer le filtre de dossier",
+      "clearType": "Retirer le filtre de type",
+      "resultCount": "Affichage de {{shown}} sur {{total}}"
+    },
     "loading": "Chargement des entrées…",
     "error": "Échec du chargement des entrées.",
     "sort": {
@@ -359,7 +386,13 @@
       "success": "{{name}} ajouté au coffre",
       "error": "Échec de l'ajout de l'entrée. Veuillez réessayer.",
       "base32Error": "Le secret doit être en Base32 valide (A-Z, 2-7).",
-      "comingSoon": "Bientôt disponible"
+      "comingSoon": "Bientôt disponible",
+      "typeLabel": "Type de code",
+      "typeTotp": "Basé sur le temps (TOTP)",
+      "typeHotp": "Basé sur un compteur (HOTP)",
+      "counterLabel": "Compteur initial",
+      "counterPlaceholder": "0",
+      "counterHint": "Les codes HOTP avancent par compteur, pas par le temps. Commencez à 0 sauf si votre fournisseur vous a donné une autre valeur."
     },
     "edit": {
       "title": "Modifier l'entrée",
@@ -410,7 +443,10 @@
       "clickToView": "Cliquer pour afficher",
       "templateSshKey": "Clé SSH",
       "templateLicense": "Licence",
-      "templateIdentity": "Identité"
+      "templateIdentity": "Identité",
+      "generate": "Générer",
+      "regenerate": "Générer le code suivant",
+      "counterValue": "Compteur {{counter}}"
     },
     "type": {
       "totp": "TOTP",
@@ -431,7 +467,29 @@
       "uriCopied": "URI copiée dans le presse-papiers",
       "uriCopyError": "Échec de la copie de l'URI",
       "qrLabel": "Scanner avec une application d'authentification"
+    },
+    "totpDetail": {
+      "title": "Détails du code",
+      "copyHint": "Cliquer pour copier le code",
+      "algorithm": "Algorithme",
+      "digits": "Chiffres",
+      "period": "Période",
+      "periodSeconds": "{{seconds}} s",
+      "added": "Ajouté",
+      "generateHotp": "Générer le code suivant",
+      "counterValue": "Compteur {{counter}}",
+      "edit": "Modifier",
+      "export": "Exporter",
+      "delete": "Supprimer",
+      "close": "Fermer"
     }
+  },
+  "reveal": {
+    "copied": "{{label}} copié · effacé dans {{seconds}}s",
+    "copyFailed": "Impossible de copier {{label}}",
+    "hidingIn": "Masquage dans {{seconds}}s",
+    "hidingInClock": "Masquage dans {{time}}",
+    "hide": "Masquer"
   },
   "credentials": {
     "templates": {
@@ -802,6 +860,7 @@
       "reveal": "Afficher",
       "timer": "Masquage dans {{remaining}}s",
       "copyAll": "Tout copier",
+      "copyAllLabel": "Phrase secrète",
       "copyAllSuccess": "Phrase secrète dans le presse-papiers — effacement dans 30s",
       "copyAllError": "Échec de la copie de la phrase secrète",
       "hide": "Masquer",
@@ -1046,6 +1105,14 @@
       "recovery": "Récupération",
       "import": "Importation"
     },
+    "welcome": {
+      "heading": "Votre coffre, rien qu'à vous",
+      "subheading": "Verrou garde vos codes 2FA, phrases de récupération et mots de passe chiffrés sur cet appareil. Rien n'en sort jamais.",
+      "offline": "Hors ligne par conception — jamais de serveur",
+      "noAccounts": "Aucun compte, aucun e-mail, aucun pistage",
+      "postQuantum": "Chiffrement post-quantique intégré",
+      "cta": "Commencer"
+    },
     "password": {
       "heading": "Créez votre mot de passe",
       "description": "Choisissez un mot de passe maître robuste pour protéger votre coffre. C'est le seul mot de passe dont vous aurez besoin de vous souvenir.",
@@ -1079,7 +1146,9 @@
         "timing": "~4 secondes"
       },
       "ariaLabel": "Sélection du niveau de sécurité",
-      "recommended": "(Recommandé)"
+      "recommended": "(Recommandé)",
+      "measuring": "Analyse de votre appareil…",
+      "calibrated": "{{memory}} Mo de mémoire · {{passes}} passes"
     },
     "recoveryKey": {
       "headingCreating": "Création de votre coffre",
@@ -1108,7 +1177,13 @@
       "print": "Imprimer",
       "toastCopied": "Clé de récupération copiée",
       "toastCopyFailed": "Échec de la copie",
-      "toastFailed": "Échec de la création du coffre"
+      "toastFailed": "Échec de la création du coffre",
+      "encrypting": "Chiffrement de votre coffre…",
+      "encryptingHint": "Le chiffrement s'exécute sur votre appareil — cela peut prendre quelques secondes.",
+      "shownOnce": "Votre clé de récupération n'est affichée qu'une fois. Sans elle (et votre mot de passe), votre coffre est irrécupérable.",
+      "confirmReentry": "Ressaisissez votre clé de récupération pour confirmer que vous l'avez enregistrée",
+      "confirmPlaceholder": "Saisissez votre clé de récupération",
+      "confirmMismatch": "Cela ne correspond pas encore à votre clé."
     },
     "import": {
       "heading": "Importer des entrées existantes",
@@ -1290,7 +1365,11 @@
       "entries": "Entrées",
       "folders": "Dossiers",
       "submitButton": "Exporter le coffre",
-      "toastSuccess": "Coffre exporté vers {{filename}}"
+      "toastSuccess": "Coffre exporté vers {{filename}}",
+      "chooseLocationButton": "Choisir l'emplacement…",
+      "savingTo": "Enregistrement dans {{filename}}",
+      "changeLocation": "Modifier",
+      "trust": "Votre export est chiffré avec votre mot de passe maître — gardez les deux en lieu sûr."
     },
     "paperBackup": {
       "title": "Sauvegarde papier",
@@ -1301,7 +1380,20 @@
       "generateButton": "Générer la sauvegarde",
       "warningPreview": "Ce document contient vos phrases secrètes en clair. Conservez-le dans un lieu physique sécurisé.",
       "retryButton": "Réessayer",
-      "printButton": "Imprimer"
+      "printButton": "Imprimer",
+      "doc": {
+        "confidential": "CONFIDENTIEL",
+        "title": "Sauvegarde papier VERROU",
+        "generated": "Généré le : {{date}}",
+        "fingerprint": "Empreinte du coffre : {{fingerprint}}",
+        "empty": "Aucune phrase secrète ni code de récupération trouvé dans ce coffre.",
+        "seedsTitle": "Phrases secrètes",
+        "passphraseNote": "Protégé par phrase de passe (le 25e mot n'est pas inclus dans cette sauvegarde)",
+        "recoveryTitle": "Codes de récupération",
+        "remaining": "{{remaining}} sur {{total}} restants",
+        "checksumLabel": "Somme de contrôle du contenu (BLAKE3) : ",
+        "storeWarning": "Conservez ce document dans un lieu physique sécurisé. Ne le photographiez PAS et ne le numérisez PAS."
+      }
     },
     "qrTransfer": {
       "send": {
@@ -1333,11 +1425,14 @@
         "sensitiveWarning": "Votre sélection inclut des phrases secrètes ou des codes de récupération. Une ré-authentification est requise.",
         "toastFileFailed": "Échec de l'enregistrement du fichier de transfert",
         "toastFileSaved": "Fichier de transfert enregistré",
-        "verificationPrompt": "Code de vérification — saisissez-le sur l'appareil destinataire :"
+        "verificationPrompt": "Code de vérification — saisissez-le sur l'appareil destinataire :",
+        "crossDeviceHint": "Sur votre autre appareil, ouvrez Verrou → Paramètres → Sauvegarde et transfert → Recevoir par QR, saisissez ce code, puis dirigez sa caméra vers cet écran."
       },
       "receive": {
         "title": "Recevoir le transfert",
         "codeDescription": "Saisissez le code de vérification de 4 mots affiché sur l'appareil émetteur.",
+        "crossDeviceHint": "Réception depuis un autre appareil : sur celui-ci, ouvrez Verrou → Paramètres → Sauvegarde et transfert → Envoyer par QR. Saisissez le code de 4 mots qu'il affiche ci-dessous, puis scannez ses QR codes.",
+        "scanHint": "Dirigez votre caméra vers l'écran de l'autre appareil — les codes sont capturés automatiquement.",
         "codePlaceholder": "mot mot mot mot",
         "codeHint": "4 mots séparés par des espaces",
         "loadFileButton": "Charger depuis un fichier",
@@ -1376,10 +1471,12 @@
     "noMatching": "Aucune entrée correspondante",
     "noEntries": "Aucune entrée dans le coffre",
     "hintsNavigate": "↑↓ naviguer",
-    "hintsCopy": "⏎ copier le code/nom d'utilisateur",
+    "hintsCopy": "⏎ copier",
     "hintsClose": "esc fermer",
     "copyUsername": "Nom d'utilisateur de {{name}} copié",
     "copyCode": "{{name}} copié",
+    "copyCodeCleared": "{{name}} copié · effacé dans {{seconds}}s",
+    "copyUsernameCleared": "Nom d'utilisateur de {{name}} copié · effacé dans {{seconds}}s",
     "copyUsernameError": "Impossible de copier le nom d'utilisateur",
     "copyCodeError": "Impossible de copier le code",
     "openVaultInfo": "Ouvrez le coffre pour copier le mot de passe",
@@ -1397,7 +1494,7 @@
     "copyCodeFailed": "Impossible de copier le code",
     "copyUsernameFailed": "Impossible de copier le nom d'utilisateur",
     "hintClose": "esc fermer",
-    "hintCopy": "⏎ copier le code/nom d'utilisateur",
+    "hintCopy": "⏎ copier",
     "hintNavigate": "↑↓ naviguer",
     "openVaultToCopy": "Ouvrez le coffre pour copier le mot de passe",
     "passwordLabel": "Mot de passe maître",
@@ -1423,6 +1520,8 @@
       "codeCopied": "Code copié",
       "openMainVault": "Ouvrez le coffre principal pour afficher cette entrée",
       "copyCode": "Copier le code",
+      "generateCode": "Générer et copier le code suivant",
+      "counterValue": "Compteur {{counter}}",
       "revealError": "Mot de passe incorrect",
       "hintsBack": "retour",
       "hintsOpen": "ouvrir",
@@ -1464,7 +1563,24 @@
     "scoreAtRisk": "À risque",
     "scoreAttention": "À surveiller",
     "toastAnalyzing": "Analyse de la santé des mots de passe…",
-    "weakPasswords": "Mots de passe faibles"
+    "weakPasswords": "Mots de passe faibles",
+    "scoreExplainerToggle": "Comment ce score est-il calculé ?",
+    "scoreExplainer": "Nous vérifions trois choses pour chaque identifiant : un mot de passe réutilisé, un mot de passe faible, et un mot de passe inchangé depuis longtemps. Votre score correspond à la proportion de ces vérifications réussies. La couverture en double authentification est suivie séparément ci-dessous et n'affecte pas ce score.",
+    "fix": "Corriger",
+    "fixAria": "Corriger le mot de passe de {{name}}",
+    "strengthWeak": "Faible",
+    "strengthFair": "Moyen",
+    "ageOverYears": "il y a plus de {{years}} ans",
+    "ageOverYear": "il y a plus d'un an",
+    "ageOverSixMonths": "il y a plus de 6 mois",
+    "ageMonths": "il y a {{count}} mois",
+    "reusedSharedWith": "partagé avec {{count}} autre(s)",
+    "coverageTitle": "Couverture en double authentification",
+    "coverageSummary": "{{count}} sur {{total}} sans 2FA",
+    "coverageHint": "La double authentification ajoute une étape à la connexion. Elle renforce un compte mais n'est pas un problème de mot de passe : elle n'affecte donc pas votre score.",
+    "addTwoFactor": "Ajouter la 2FA",
+    "addTwoFactorAria": "Ajouter la double authentification pour {{name}}",
+    "passwordsAllStrong": "Chaque mot de passe est fort et unique."
   },
   "folders": {
     "allEntries": "Toutes les entrées",
@@ -1478,7 +1594,16 @@
     "confirmDelete": "Supprimer le dossier « {{name}} » ? Les entrées qu'il contient ne seront pas supprimées.",
     "createError": "Échec de la création du dossier.",
     "renameError": "Échec du renommage du dossier.",
-    "deleteError": "Échec de la suppression du dossier."
+    "deleteError": "Échec de la suppression du dossier.",
+    "moveError": "Échec du déplacement du dossier.",
+    "newSubfolder": "Nouveau sous-dossier",
+    "newSubfolderAria": "Ajouter un sous-dossier à {{name}}",
+    "moveUp": "Monter",
+    "moveUpAria": "Monter {{name}}",
+    "moveDown": "Descendre",
+    "moveDownAria": "Descendre {{name}}",
+    "expandAria": "Déplier {{name}}",
+    "collapseAria": "Replier {{name}}"
   },
   "attachments": {
     "title": "Pièces jointes",

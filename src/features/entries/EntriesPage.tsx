@@ -1,15 +1,17 @@
 import type { Component } from "solid-js";
-import { Show, createSignal, createResource, createEffect, onCleanup } from "solid-js";
-import { useLocation } from "@solidjs/router";
+import { Show, createSignal, createResource, createEffect, onCleanup, createMemo } from "solid-js";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { useToast } from "../../components/useToast";
-import { searchQuery } from "../../stores/searchStore";
+import { searchQuery, clearSearch } from "../../stores/searchStore";
 import { t } from "../../stores/i18nStore";
-import { selectedFolderId } from "../../stores/folderStore";
+import { selectedFolderId, setSelectedFolderId } from "../../stores/folderStore";
+import { listFolders } from "../folders/ipc";
 import { listEntries, deleteEntry, updateEntry, type EntryMetadataDto } from "./ipc";
 import { filterEntries, sortEntries, type SortMode } from "./filterEntries";
 import { EntryList } from "./EntryList";
+import { FilterChip } from "./FilterChip";
 import { AddEntryModal } from "./AddEntryModal";
 import { AddSeedPhraseForm } from "../seed/AddSeedPhraseForm";
 import { SeedPhraseDetailModal } from "../seed/SeedPhraseDetailModal";
@@ -25,6 +27,7 @@ import { AddCredentialModal } from "../credentials/AddCredentialModal";
 import { CredentialDetailModal } from "../credentials/CredentialDetailModal";
 import { EditCredentialModal } from "../credentials/EditCredentialModal";
 import { EditEntryModal } from "./EditEntryModal";
+import { TotpDetailModal } from "./TotpDetailModal";
 import { ExportUriModal } from "./ExportUriModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import styles from "./EntriesPage.module.css";
@@ -40,6 +43,15 @@ const TYPE_FILTER_MAP: Record<string, string[]> = {
   credential: ["credential"],
 };
 
+/** Map sidebar URL ?type= param to the i18n key for its display label. */
+const TYPE_LABEL_KEY: Record<string, string> = {
+  totp: "entries.type.totp",
+  seed: "entries.type.seed",
+  recovery: "entries.type.recovery",
+  note: "entries.type.note",
+  credential: "entries.type.credential",
+};
+
 export const EntriesPage: Component = () => {
   const location = useLocation();
   const toast = useToast();
@@ -50,6 +62,7 @@ export const EntriesPage: Component = () => {
   const [credentialModalOpen, setCredentialModalOpen] = createSignal(false);
   const [noteDetailEntry, setNoteDetailEntry] = createSignal<EntryMetadataDto | null>(null);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
+  const [totpDetailEntry, setTotpDetailEntry] = createSignal<EntryMetadataDto | null>(null);
   const [editEntryId, setEditEntryId] = createSignal<string | null>(null);
   const [seedDetailEntry, setSeedDetailEntry] = createSignal<EntryMetadataDto | null>(null);
   const [editSeedEntryId, setEditSeedEntryId] = createSignal<string | null>(null);
@@ -66,9 +79,27 @@ export const EntriesPage: Component = () => {
   const [pendingCredentialRefresh, setPendingCredentialRefresh] = createSignal<string | null>(null);
   const [exportUriEntry, setExportUriEntry] = createSignal<{ id: string; name: string; issuer?: string; entryType: string } | null>(null);
   const [sortMode, setSortMode] = createSignal<SortMode>("alpha-asc");
+  const navigate = useNavigate();
   const [entries, { refetch }] = createResource(listEntries);
   const [recoveryStats, { refetch: refetchStats }] = createResource(getAllRecoveryStats);
+  const [folders] = createResource(listFolders);
   const [announcement, setAnnouncement] = createSignal("");
+
+  /** The active sidebar ?type= filter, if it maps to a known type. */
+  const activeTypeParam = createMemo(() => {
+    const typeParam = new URLSearchParams(location.search).get("type");
+    return typeParam && TYPE_FILTER_MAP[typeParam] ? typeParam : null;
+  });
+
+  /** Display name of the actively-selected folder (null when none / not yet loaded). */
+  const activeFolderName = createMemo(() => {
+    const folderId = selectedFolderId();
+    if (!folderId) return null;
+    return (folders() ?? []).find((f) => f.id === folderId)?.name ?? null;
+  });
+
+  /** Total entries in the vault, before any folder/type/search narrowing. */
+  const totalCount = () => (entries() ?? []).length;
 
   const filteredEntries = () => {
     let result = entries() ?? [];
@@ -76,14 +107,17 @@ export const EntriesPage: Component = () => {
     if (folderId) {
       result = result.filter((e) => e.folderId === folderId);
     }
-    const typeParam = new URLSearchParams(location.search).get("type");
-    if (typeParam && TYPE_FILTER_MAP[typeParam]) {
+    const typeParam = activeTypeParam();
+    if (typeParam) {
       const allowed = TYPE_FILTER_MAP[typeParam];
       result = result.filter((e) => allowed.includes(e.entryType));
     }
     const filtered = filterEntries(result, searchQuery());
     return sortEntries(filtered, sortMode());
   };
+
+  const clearTypeFilter = () => navigate("/entries");
+  const clearFolderFilter = () => setSelectedFolderId(null);
 
   // Debounce the aria-live announcement to avoid per-keystroke screen reader noise
   createEffect(() => {
@@ -178,6 +212,7 @@ export const EntriesPage: Component = () => {
       toast.success(t("entries.delete.success"));
       setDeleteTarget(null);
       setEditEntryId(null);
+      setTotpDetailEntry(null);
       setEditCredentialEntryId(null);
       setCredentialDetailEntry(null);
       refetch();
@@ -275,6 +310,31 @@ export const EntriesPage: Component = () => {
     setExportUriEntry({ id: entryId, name, issuer, entryType });
   };
 
+  // TOTP detail → Edit: close the read-only detail and open the existing edit form.
+  const handleTotpEdit = (entryId: string) => {
+    setTotpDetailEntry(null);
+    setEditEntryId(entryId);
+  };
+
+  // TOTP detail → Export: close the detail and open the existing ExportUriModal.
+  const handleTotpExport = (entryId: string) => {
+    const detail = totpDetailEntry();
+    setTotpDetailEntry(null);
+    setExportUriEntry({
+      id: entryId,
+      name: detail?.name ?? "",
+      issuer: detail?.issuer,
+      entryType: detail?.entryType ?? "totp",
+    });
+  };
+
+  // TOTP detail → Delete: route through the standard delete flow (cascade-aware
+  // for linked recovery codes). The detail stays open until the user confirms;
+  // handleConfirmDelete then closes it.
+  const handleTotpDelete = (entryId: string, entryName: string) => {
+    void handleDeleteRequest(entryId, entryName);
+  };
+
   // Seed phrase edit saved: close edit modal, refresh detail.
   // The createEffect above will reopen the detail modal with fresh data once refetch completes.
   const handleSeedEditSuccess = () => {
@@ -366,6 +426,36 @@ export const EntriesPage: Component = () => {
         </div>
       </div>
 
+      <Show when={(activeFolderName() || activeTypeParam()) && entries() && !entries.loading}>
+        <div class={styles.filterBar}>
+          <span class={styles.filterLabel}>{t("entries.filter.activeLabel")}</span>
+          <Show when={activeFolderName()}>
+            {(name) => (
+              <FilterChip
+                label={t("entries.filter.folderChip", { name: name() })}
+                clearLabel={t("entries.filter.clearFolder")}
+                onClear={clearFolderFilter}
+              />
+            )}
+          </Show>
+          <Show when={activeTypeParam()}>
+            {(param) => (
+              <FilterChip
+                label={t(TYPE_LABEL_KEY[param()])}
+                clearLabel={t("entries.filter.clearType")}
+                onClear={clearTypeFilter}
+              />
+            )}
+          </Show>
+          <span class={styles.resultCount}>
+            {t("entries.filter.resultCount", {
+              shown: String(filteredEntries().length),
+              total: String(totalCount()),
+            })}
+          </span>
+        </div>
+      </Show>
+
       <Show when={entries.loading}>
         <p class={styles.loading}>{t("entries.loading")}</p>
       </Show>
@@ -380,10 +470,14 @@ export const EntriesPage: Component = () => {
           searchQuery={searchQuery()}
           recoveryStats={recoveryStats()}
           onAdd={() => setAddMenuOpen(true)}
+          onClearSearch={clearSearch}
           onSelect={(id) => {
             const all = entries() ?? [];
             const entry = all.find((e) => e.id === id);
-            if (entry?.entryType === "seed_phrase") {
+            if (entry?.entryType === "totp" || entry?.entryType === "hotp") {
+              // TOTP/HOTP open a calm read-only detail; Edit is reached from there.
+              setTotpDetailEntry(entry);
+            } else if (entry?.entryType === "seed_phrase") {
               setSeedDetailEntry(entry);
             } else if (entry?.entryType === "recovery_code") {
               setRecoveryDetailEntry(entry);
@@ -546,6 +640,26 @@ export const EntriesPage: Component = () => {
             walletName={target().name}
             onDeleted={handleSeedDeleted}
             onCancel={() => setDeleteSeedTarget(null)}
+          />
+        )}
+      </Show>
+
+      <Show when={totpDetailEntry()}>
+        {(entry) => (
+          <TotpDetailModal
+            open={true}
+            onClose={() => setTotpDetailEntry(null)}
+            entryId={entry().id}
+            entryType={entry().entryType}
+            name={entry().name}
+            issuer={entry().issuer}
+            algorithm={entry().algorithm}
+            digits={entry().digits}
+            period={entry().period}
+            createdAt={entry().createdAt}
+            onEdit={handleTotpEdit}
+            onExport={handleTotpExport}
+            onDelete={handleTotpDelete}
           />
         )}
       </Show>

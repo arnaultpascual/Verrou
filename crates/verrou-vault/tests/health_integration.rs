@@ -327,9 +327,10 @@ fn overall_score_decreases_with_issues() {
     let report = analyze_password_health(db.connection(), &master_key).unwrap();
 
     assert_eq!(report.total_credentials, 2);
-    // Issues: 2 reused + 2 weak + 0 old + 2 no_totp = 6 issues
-    // Total checks: 2 * 4 = 8
-    // Score: 100 - (6 * 100 / 8) = 100 - 75 = 25
+    // Both share the password "weak" → reused 2; both are Weak → weak 2; old 0.
+    // Missing 2FA is tracked separately and NOT scored, so:
+    //   issues = 2 reused + 2 weak + 0 old = 4; checks = 2 * 3 = 6
+    //   score  = 100 - (4 * 100 / 6) = 100 - 66 = 34
     assert!(
         report.overall_score < 50,
         "score should be low with many issues"

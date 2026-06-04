@@ -1,4 +1,5 @@
 export { Icon, type IconName, type IconProps } from "./Icon";
+export { Logo, type LogoProps } from "./Logo";
 export { Spinner, type SpinnerProps } from "./Spinner";
 export { Button, type ButtonProps } from "./Button";
 export { Input, type InputProps } from "./Input";

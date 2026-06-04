@@ -1,4 +1,5 @@
 import type { Component, JSX } from "solid-js";
+import { For } from "solid-js";
 import {
   Root as TooltipRoot,
   Trigger as TooltipTrigger,
@@ -16,6 +17,10 @@ export interface ShortcutTooltipProps {
 }
 
 export const ShortcutTooltip: Component<ShortcutTooltipProps> = (props) => {
+  // Split "Ctrl+Shift+L" into individual keycaps, keeping the "+" as a
+  // visible separator between them.
+  const keys = () => props.shortcut.split("+");
+
   return (
     <TooltipRoot>
       <TooltipTrigger as="span" class={styles.trigger}>
@@ -23,7 +28,16 @@ export const ShortcutTooltip: Component<ShortcutTooltipProps> = (props) => {
       </TooltipTrigger>
       <TooltipPortal>
         <TooltipContent class={styles.tooltipContent}>
-          {props.shortcut}
+          <span class={styles.keys}>
+            <For each={keys()}>
+              {(key, index) => (
+                <>
+                  {index() > 0 && <span class={styles.separator}>+</span>}
+                  <kbd class={styles.key}>{key}</kbd>
+                </>
+              )}
+            </For>
+          </span>
           <TooltipArrow />
         </TooltipContent>
       </TooltipPortal>

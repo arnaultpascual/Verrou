@@ -1,10 +1,11 @@
 import { render, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-// Mock Tauri APIs
+// Mock Tauri APIs — a shared `hide` spy so tests can assert the popup dismisses.
+const hideMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
-    hide: vi.fn().mockResolvedValue(undefined),
+    hide: hideMock,
     onFocusChanged: vi.fn().mockResolvedValue(() => {}),
   }),
 }));
@@ -85,6 +86,19 @@ const MOCK_ENTRIES: EntryMetadataDto[] = [
     updatedAt: "2026-01-01T00:00:00Z",
   },
 ];
+
+const HOTP_ENTRY: EntryMetadataDto = {
+  id: "entry-hotp",
+  entryType: "hotp",
+  name: "Legacy VPN",
+  issuer: "vpn.corp.example.com",
+  algorithm: "SHA1",
+  digits: 6,
+  period: 30,
+  pinned: false,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
 
 describe("QuickSearch", () => {
   beforeEach(() => {
@@ -194,12 +208,14 @@ describe("QuickSearch", () => {
     });
   });
 
-  it("shows keyboard hints", async () => {
+  it("shows keyboard hints consistent with Enter = copy", async () => {
     const { container } = render(() => <QuickSearch />);
 
     await waitFor(() => {
       expect(container.textContent).toContain("navigate");
-      expect(container.textContent).toContain("open");
+      // Enter copies the primary value — the hint must say "copy", not "open".
+      expect(container.textContent).toContain("copy");
+      expect(container.textContent).not.toContain("open");
       expect(container.textContent).toContain("close");
     });
   });
@@ -214,7 +230,7 @@ describe("QuickSearch", () => {
     });
   });
 
-  it("opens the detail view on Enter for the selected entry", async () => {
+  it("copies the live code and hides the popup on Enter for a TOTP entry", async () => {
     const { container } = render(() => <QuickSearch />);
 
     await waitFor(() => {
@@ -222,9 +238,9 @@ describe("QuickSearch", () => {
       expect(items.length).toBe(4);
     });
 
-    // Type query to filter to credential entry
+    // Narrow to a single TOTP entry so the selected (index 0) result is GitHub.
     const input = container.querySelector("input[role='combobox']") as HTMLInputElement;
-    fireEvent.input(input, { target: { value: "gitlab" } });
+    fireEvent.input(input, { target: { value: "github" } });
 
     await waitFor(() => {
       const items = container.querySelectorAll("[role='option']");
@@ -234,15 +250,42 @@ describe("QuickSearch", () => {
     const wrapper = container.firstElementChild as HTMLElement;
     fireEvent.keyDown(wrapper, { key: "Enter" });
 
-    // Enter opens the detail view — the search combobox is replaced by the detail.
+    // Enter copies the live code via the concealed-clipboard path…
     await waitFor(() => {
-      expect(container.querySelector("input[role='combobox']")).toBeNull();
+      expect(ipc.copyToClipboard).toHaveBeenCalledWith("123456");
     });
-    // Secrets are never copied straight from the list — the row stays metadata-only.
-    expect(ipc.copyToClipboard).not.toHaveBeenCalled();
+    // …and hides the popup instead of opening a detail screen.
+    await waitFor(() => {
+      expect(hideMock).toHaveBeenCalled();
+    });
+    expect(container.querySelector("input[role='combobox']")).not.toBeNull();
   });
 
-  it("does not call generateTotpCode when opening a credential", async () => {
+  it("copies the live code on click for a TOTP entry without navigating", async () => {
+    const { container } = render(() => <QuickSearch />);
+
+    await waitFor(() => {
+      expect(container.querySelectorAll("[role='option']").length).toBe(4);
+    });
+
+    const input = container.querySelector("input[role='combobox']") as HTMLInputElement;
+    fireEvent.input(input, { target: { value: "github" } });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll("[role='option']").length).toBe(1);
+    });
+
+    const row = container.querySelector("[role='option']") as HTMLElement;
+    fireEvent.click(row);
+
+    await waitFor(() => {
+      expect(ipc.copyToClipboard).toHaveBeenCalledWith("123456");
+    });
+    // Click behaves identically to Enter: copy + dismiss, no detail screen.
+    expect(container.querySelector("input[role='combobox']")).not.toBeNull();
+  });
+
+  it("copies the username (not the password) on Enter for a credential with a username", async () => {
     const { container } = render(() => <QuickSearch />);
 
     await waitFor(() => {
@@ -250,6 +293,7 @@ describe("QuickSearch", () => {
       expect(items.length).toBe(4);
     });
 
+    // GitLab Login is a credential with username "dev@gitlab.com".
     const input = container.querySelector("input[role='combobox']") as HTMLInputElement;
     fireEvent.input(input, { target: { value: "gitlab" } });
 
@@ -258,19 +302,48 @@ describe("QuickSearch", () => {
       expect(items.length).toBe(1);
     });
 
-    // Record call count before Enter press
-    const callCountBefore = (ipc.generateTotpCode as ReturnType<typeof vi.fn>).mock.calls.length;
+    const wrapper = container.firstElementChild as HTMLElement;
+    fireEvent.keyDown(wrapper, { key: "Enter" });
+
+    // The username is display-safe and copied directly; the password is never
+    // revealed from the list, so generateTotpCode is irrelevant here too.
+    await waitFor(() => {
+      expect(ipc.copyToClipboard).toHaveBeenCalledWith("dev@gitlab.com");
+    });
+    expect(ipc.generateTotpCode).not.toHaveBeenCalled();
+    // Copy + dismiss — no detail navigation for the username fast-path.
+    await waitFor(() => {
+      expect(hideMock).toHaveBeenCalled();
+    });
+    expect(container.querySelector("input[role='combobox']")).not.toBeNull();
+  });
+
+  it("opens the detail view on Enter for a non-copyable entry (seed phrase)", async () => {
+    const { container } = render(() => <QuickSearch />);
+
+    await waitFor(() => {
+      const items = container.querySelectorAll("[role='option']");
+      expect(items.length).toBe(4);
+    });
+
+    // Bitcoin Wallet is a seed phrase — its secret needs reveal, so Enter must
+    // open the detail view rather than copy anything from the list.
+    const input = container.querySelector("input[role='combobox']") as HTMLInputElement;
+    fireEvent.input(input, { target: { value: "bitcoin" } });
+
+    await waitFor(() => {
+      const items = container.querySelectorAll("[role='option']");
+      expect(items.length).toBe(1);
+    });
 
     const wrapper = container.firstElementChild as HTMLElement;
     fireEvent.keyDown(wrapper, { key: "Enter" });
 
-    // Detail view opens; a credential detail must not generate TOTP codes.
     await waitFor(() => {
       expect(container.querySelector("input[role='combobox']")).toBeNull();
     });
-
-    const callCountAfter = (ipc.generateTotpCode as ReturnType<typeof vi.fn>).mock.calls.length;
-    expect(callCountAfter).toBe(callCountBefore);
+    // Non-copyable rows never touch the clipboard.
+    expect(ipc.copyToClipboard).not.toHaveBeenCalled();
   });
 
   it("resets selectedIndex when query changes", async () => {
@@ -299,6 +372,57 @@ describe("QuickSearch", () => {
       if (items.length > 0) {
         expect(items[0].getAttribute("aria-selected")).toBe("true");
       }
+    });
+  });
+
+  describe("HOTP fast-path (Enter/click generates the next code)", () => {
+    beforeEach(() => {
+      // A single HOTP entry so the selected (index 0) result is the HOTP one.
+      vi.spyOn(ipc, "listEntries").mockResolvedValue([HOTP_ENTRY]);
+      vi.spyOn(ipc, "generateHotpCode").mockResolvedValue({
+        code: "654321",
+        counter: 42,
+      });
+    });
+
+    it("generates + copies the next HOTP code and hides the popup on Enter", async () => {
+      const { container } = render(() => <QuickSearch />);
+
+      await waitFor(() => {
+        expect(container.querySelectorAll("[role='option']").length).toBe(1);
+      });
+
+      const wrapper = container.firstElementChild as HTMLElement;
+      fireEvent.keyDown(wrapper, { key: "Enter" });
+
+      // Counter-based generation (not the time-based TOTP path).
+      await waitFor(() => {
+        expect(ipc.generateHotpCode).toHaveBeenCalledWith("entry-hotp");
+        expect(ipc.copyToClipboard).toHaveBeenCalledWith("654321");
+      });
+      expect(ipc.generateTotpCode).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(hideMock).toHaveBeenCalled();
+      });
+      // Stays on the search screen (no detail navigation for the copy fast-path).
+      expect(container.querySelector("input[role='combobox']")).not.toBeNull();
+    });
+
+    it("generates + copies the next HOTP code on click", async () => {
+      const { container } = render(() => <QuickSearch />);
+
+      await waitFor(() => {
+        expect(container.querySelectorAll("[role='option']").length).toBe(1);
+      });
+
+      const row = container.querySelector("[role='option']") as HTMLElement;
+      fireEvent.click(row);
+
+      await waitFor(() => {
+        expect(ipc.generateHotpCode).toHaveBeenCalledWith("entry-hotp");
+        expect(ipc.copyToClipboard).toHaveBeenCalledWith("654321");
+      });
+      expect(container.querySelector("input[role='combobox']")).not.toBeNull();
     });
   });
 });

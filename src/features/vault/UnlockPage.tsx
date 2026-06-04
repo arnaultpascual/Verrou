@@ -1,7 +1,7 @@
 import type { Component } from "solid-js";
-import { createSignal, createMemo, onMount, Show, onCleanup, createResource } from "solid-js";
+import { createSignal, onMount, Show, onCleanup, createResource } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { PasswordInput, Spinner, Icon, useToast } from "../../components";
+import { PasswordInput, Spinner, Icon, Logo, useToast } from "../../components";
 import {
   isBiometricAvailable as platformBiometricAvailable,
   biometricProviderName as platformBiometricProvider,
@@ -12,14 +12,6 @@ import { checkBiometricAvailability, unlockVaultBiometric } from "./biometricIpc
 import { CorruptionErrorPage } from "./CorruptionErrorPage";
 import { t } from "../../stores/i18nStore";
 import styles from "./UnlockPage.module.css";
-
-/** Milestone-based phases for unlock. */
-const UNLOCK_PHASE_KEYS = [
-  { key: "vault.unlock.progress.deriving", target: 20 },
-  { key: "vault.unlock.progress.verifying", target: 55 },
-  { key: "vault.unlock.progress.decrypting", target: 80 },
-  { key: "vault.unlock.progress.opening", target: 100 },
-] as const;
 
 type UnlockState = "idle" | "unlocking" | "error" | "cooldown" | "success";
 
@@ -44,8 +36,6 @@ export const UnlockPage: Component = () => {
   const [password, setPassword] = createSignal("");
   const [unlockState, setUnlockState] = createSignal<UnlockState>("idle");
   const [errorMessage, setErrorMessage] = createSignal("");
-  const [phase, setPhase] = createSignal(0);
-  const [progress, setProgress] = createSignal(0);
   const [remainingMs, setRemainingMs] = createSignal(0);
   const [shake, setShake] = createSignal(false);
 
@@ -57,33 +47,8 @@ export const UnlockPage: Component = () => {
   const biometricReady = () =>
     platformBiometricAvailable() && biometricEnrolled();
 
-  const phaseMessage = createMemo(() => t(UNLOCK_PHASE_KEYS[phase()].key));
-
   let passwordRef: HTMLInputElement | undefined;
   let countdownInterval: ReturnType<typeof setInterval> | undefined;
-  let stopAnim: (() => void) | undefined;
-  let creepInterval: ReturnType<typeof setInterval> | undefined;
-
-  /**
-   * Smoothly animate progress toward a target over `durationMs`.
-   * Returns a cleanup function to stop the animation.
-   */
-  const animateTo = (target: number, durationMs: number): (() => void) => {
-    const start = progress();
-    const delta = target - start;
-    if (delta <= 0) { setProgress(target); return () => {}; }
-    const startTime = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / durationMs);
-      const eased = 1 - (1 - t) * (1 - t);
-      setProgress(Math.round(start + delta * eased));
-      if (t < 1) { raf = requestAnimationFrame(tick); }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  };
 
   onMount(async () => {
     passwordRef?.focus();
@@ -107,8 +72,6 @@ export const UnlockPage: Component = () => {
 
   onCleanup(() => {
     if (countdownInterval) clearInterval(countdownInterval);
-    if (creepInterval) clearInterval(creepInterval);
-    stopAnim?.();
   });
 
   const formatCountdown = (ms: number): string => {
@@ -188,39 +151,13 @@ export const UnlockPage: Component = () => {
 
     setUnlockState("unlocking");
     setErrorMessage("");
-    setProgress(0);
-    setPhase(0);
-
-    // Yield a frame so the browser paints the progress view before
-    // the heavy IPC call potentially blocks the event loop.
-    await new Promise((r) => requestAnimationFrame(r));
-
-    // Start progress animation
-    stopAnim = animateTo(UNLOCK_PHASE_KEYS[0].target, 800);
-
-    // Creep through phases while KDF runs on backend
-    creepInterval = setInterval(() => {
-      setPhase((p) => {
-        const next = Math.min(p + 1, 2); // Cap at phase 2 until backend resolves
-        if (next !== p) {
-          stopAnim?.();
-          stopAnim = animateTo(UNLOCK_PHASE_KEYS[next].target, 2000);
-        }
-        return next;
-      });
-    }, 2000);
 
     try {
+      // The genuine wait is the Argon2id KDF running in Rust. We show an
+      // indeterminate "Unlocking…" indicator while this promise is pending
+      // and snap to done the moment it actually resolves — no scripted phases,
+      // no cosmetic delay.
       const result = await unlockVault(pw);
-      if (creepInterval) clearInterval(creepInterval);
-      stopAnim?.();
-
-      // Backend done — animate to 100%
-      setPhase(3);
-      stopAnim = animateTo(100, 400);
-
-      // Brief pause for visual completion
-      await new Promise((resolve) => setTimeout(resolve, 500));
 
       setUnlockState("success");
       setVaultState("unlocked");
@@ -232,10 +169,6 @@ export const UnlockPage: Component = () => {
 
       navigate("/entries", { replace: true });
     } catch (err) {
-      if (creepInterval) clearInterval(creepInterval);
-      stopAnim?.();
-      setProgress(0);
-
       const errorStr = typeof err === "string" ? err : String(err);
       const parsed = parseUnlockError(errorStr);
 
@@ -276,36 +209,19 @@ export const UnlockPage: Component = () => {
         <Show
           when={unlockState() !== "unlocking"}
           fallback={
-            <div class={styles.unlockProgress}>
+            <div class={styles.unlockProgress} role="status" aria-live="polite">
               <div class={styles.spinnerContainer}>
                 <Spinner size={40} />
               </div>
-              <h2 class={styles.unlockProgressHeading}>{t("vault.unlock.heading")}</h2>
-              <p class={styles.phaseMessage}>{phaseMessage()}</p>
-              <div class={styles.progressWrapper}>
-                <div
-                  class={styles.progressBar}
-                  role="progressbar"
-                  aria-valuenow={progress()}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={t("vault.unlock.heading")}
-                >
-                  <div
-                    class={styles.progressFill}
-                    style={{ width: `${progress()}%` }}
-                  />
-                </div>
-              </div>
-              <p class={styles.progressHint}>
-                {t("vault.unlock.progress.hint")}
-              </p>
+              <h2 class={styles.unlockProgressHeading}>
+                {t("vault.unlock.progress.heading")}
+              </h2>
             </div>
           }
         >
           <div class={styles.content}>
             <div class={styles.lockIcon} aria-hidden="true">
-              <Icon name="shield" size={48} />
+              <Logo size={64} />
             </div>
 
             <h1 class={styles.heading}>{t("vault.unlock.lockedHeading")}</h1>

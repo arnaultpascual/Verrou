@@ -1,5 +1,6 @@
 import { render, fireEvent } from "@solidjs/testing-library";
 import { PasswordInput } from "../../components/PasswordInput";
+import { Input } from "../../components/Input";
 
 describe("PasswordInput", () => {
   describe("common behavior", () => {
@@ -174,6 +175,39 @@ describe("PasswordInput", () => {
       expect(bar.getAttribute("aria-valuemin")).toBe("0");
       expect(bar.getAttribute("aria-valuemax")).toBe("100");
       expect(bar.getAttribute("aria-label")).toContain("Password strength");
+    });
+  });
+
+  describe("shared field styling (de-duplication)", () => {
+    // Both Input and PasswordInput `composes:` from field.module.css, so the
+    // input/label carry the SAME generated field class. This guards against the
+    // styling being copy-pasted (and drifting) again.
+    it("input shares the composed field class with Input", () => {
+      const inp = render(() => <Input label="A" />);
+      const pw = render(() => <PasswordInput label="B" mode="unlock" />);
+      const inputClasses = new Set(
+        inp.container.querySelector("input")!.className.split(/\s+/),
+      );
+      const pwClasses = pw.container
+        .querySelector("input")!
+        .className.split(/\s+/);
+      // At least one class on the PasswordInput input is the same generated
+      // class present on the plain Input input → shared source of truth.
+      expect(pwClasses.some((c) => c && inputClasses.has(c))).toBe(true);
+    });
+
+    it("label shares the composed field class with Input", () => {
+      const inp = render(() => <Input label="A" />);
+      const pw = render(() => <PasswordInput label="B" mode="unlock" />);
+      const inputLabelClasses = new Set(
+        inp.container.querySelector("label")!.className.split(/\s+/),
+      );
+      const pwLabelClasses = pw.container
+        .querySelector("label")!
+        .className.split(/\s+/);
+      expect(pwLabelClasses.some((c) => c && inputLabelClasses.has(c))).toBe(
+        true,
+      );
     });
   });
 

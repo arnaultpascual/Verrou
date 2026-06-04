@@ -1,13 +1,15 @@
 import type { Component } from "solid-js";
-import { Show, createSignal } from "solid-js";
+import { Show } from "solid-js";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/Button";
 import { ReAuthPrompt } from "../../components/ReAuthPrompt";
-import { useToast } from "../../components/useToast";
+import { AutoHideCountdown } from "../../components/AutoHideCountdown";
 import { Icon } from "../../components/Icon";
 import { SeedViewer } from "./SeedViewer";
 import { revealSeedPhrase } from "./ipc";
 import type { SeedDisplay } from "./ipc";
+import { useReveal } from "../entries/useReveal";
+import { useRevealCopy } from "../entries/useRevealCopy";
 import { AttachmentsSection } from "../attachments/AttachmentsSection";
 import { t } from "../../stores/i18nStore";
 import styles from "./SeedPhraseDetailModal.module.css";
@@ -34,30 +36,25 @@ export interface SeedPhraseDetailModalProps {
 }
 
 export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (props) => {
-  const toast = useToast();
-  const [revealedData, setRevealedData] = createSignal<SeedDisplay | null>(null);
-  const [showReAuth, setShowReAuth] = createSignal(false);
+  const copyReveal = useRevealCopy();
 
-  const handleRevealRequest = () => {
-    setShowReAuth(true);
-  };
+  // Shared reveal grammar: re-auth gate, unified 60s auto-hide, clear-on-lock,
+  // clear-on-cleanup. The seed phrase is never copied across IPC except as the
+  // display-safe word list returned by revealSeedPhrase.
+  const reveal = useReveal<SeedDisplay>({
+    revealFn: (password) => revealSeedPhrase(props.entryId, password),
+  });
 
-  const handleVerified = async (password: string) => {
-    // Throws on wrong password — ReAuthPrompt surfaces the error inline and
-    // keeps the prompt open for retry. We only close on a real reveal success.
-    const data = await revealSeedPhrase(props.entryId, password);
-    setRevealedData(data);
-    setShowReAuth(false);
-  };
-
-  const handleClear = () => {
-    setRevealedData(null);
+  const handleCopyAll = () => {
+    const data = reveal.revealed();
+    if (!data) return;
+    void copyReveal(data.words.join(" "), t("seed.viewer.copyAllLabel"));
   };
 
   const handleClose = () => {
-    // Clear any revealed data before closing
-    setRevealedData(null);
-    setShowReAuth(false);
+    // Clear any revealed secret + close the re-auth prompt before closing.
+    reveal.hide();
+    reveal.cancelReAuth();
     props.onClose();
   };
 
@@ -121,11 +118,11 @@ export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (pro
                 <span class={styles.metaValue} data-testid="seed-detail-issuer">{props.issuer}</span>
               </div>
             </Show>
-            <Show when={revealedData()?.wordCount ?? props.wordCount}>
+            <Show when={reveal.revealed()?.wordCount ?? props.wordCount}>
               <div class={styles.metaRow}>
                 <span class={styles.metaLabel}>{t("seed.detail.words")}</span>
                 <span class={styles.metaValue} data-testid="seed-detail-word-count">
-                  {t("seed.detail.wordCount", { count: revealedData()?.wordCount ?? props.wordCount })}
+                  {t("seed.detail.wordCount", { count: reveal.revealed()?.wordCount ?? props.wordCount })}
                 </span>
               </div>
             </Show>
@@ -133,7 +130,7 @@ export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (pro
               <span class={styles.metaLabel}>{t("seed.detail.added")}</span>
               <span class={styles.metaValue}>{formatDate(props.createdAt)}</span>
             </div>
-            <Show when={revealedData()?.hasPassphrase}>
+            <Show when={reveal.revealed()?.hasPassphrase}>
               <div class={styles.metaRow}>
                 <span class={styles.metaLabel}>{t("seed.detail.passphrase")}</span>
                 <span class={styles.metaValue}>
@@ -148,11 +145,18 @@ export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (pro
 
           {/* Seed phrase viewer */}
           <SeedViewer
-            wordCount={revealedData()?.wordCount ?? props.wordCount ?? 12}
-            hasPassphrase={revealedData()?.hasPassphrase ?? false}
-            revealedData={revealedData()}
-            onRevealRequest={handleRevealRequest}
-            onClear={handleClear}
+            wordCount={reveal.revealed()?.wordCount ?? props.wordCount ?? 12}
+            hasPassphrase={reveal.revealed()?.hasPassphrase ?? false}
+            revealedData={reveal.revealed()}
+            onRevealRequest={reveal.request}
+            onCopyAll={handleCopyAll}
+            onHide={reveal.hide}
+            countdown={
+              <AutoHideCountdown
+                remainingMs={reveal.remainingMs()}
+                onHide={reveal.hide}
+              />
+            }
           />
           <AttachmentsSection entryId={props.entryId} />
         </div>
@@ -160,9 +164,9 @@ export const SeedPhraseDetailModal: Component<SeedPhraseDetailModalProps> = (pro
 
       {/* Re-auth modal (stacks on top of detail modal) */}
       <ReAuthPrompt
-        open={showReAuth()}
-        onClose={() => setShowReAuth(false)}
-        onVerified={handleVerified}
+        open={reveal.showReAuth()}
+        onClose={reveal.cancelReAuth}
+        onVerified={reveal.onVerified}
       />
     </>
   );

@@ -34,13 +34,11 @@ export const Spinner: Component<SpinnerProps> = (props) => {
           cy="12"
           r="10"
           stroke="currentColor"
-          stroke-width="3"
         />
         <path
           class={styles.arc}
           d="M12 2a10 10 0 017.07 2.93"
           stroke="currentColor"
-          stroke-width="3"
           stroke-linecap="round"
         />
       </svg>

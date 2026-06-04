@@ -1,7 +1,7 @@
 import type { Component } from "solid-js";
 import { Show, onMount, onCleanup, createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Icon, ShortcutTooltip } from "../../components";
+import { Icon, Logo, ShortcutTooltip } from "../../components";
 import { vaultState, setVaultState } from "../../stores/vaultStore";
 import { searchQuery, setSearchQuery, clearSearch } from "../../stores/searchStore";
 import { lockVault } from "../vault/ipc";
@@ -53,7 +53,7 @@ export const Header: Component = () => {
   return (
     <header class={styles.header}>
       <div class={styles.titleSection}>
-        <h1 class={styles.title}>{t("header.title")}</h1>
+        <Logo wordmark size={22} />
       </div>
       <div class={styles.searchSection}>
         <div

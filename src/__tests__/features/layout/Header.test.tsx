@@ -29,16 +29,16 @@ describe("Header", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the app title VERROU", () => {
-    const { getByText } = renderHeader();
-    expect(getByText("VERROU")).toBeDefined();
+  it("renders the brand logo (wordmark + mark)", () => {
+    const { getByText, container } = renderHeader();
+    expect(getByText("Verrou")).toBeDefined();
+    expect(container.querySelector('svg[aria-label="Verrou"]')).not.toBeNull();
   });
 
-  it("renders h1 with VERROU text", () => {
+  it("renders the Verrou wordmark (no h1 title)", () => {
     const { container } = renderHeader();
-    const h1 = container.querySelector("h1");
-    expect(h1).not.toBeNull();
-    expect(h1!.textContent).toBe("VERROU");
+    expect(container.textContent).toContain("Verrou");
+    expect(container.querySelector("h1")).toBeNull();
   });
 
   it("renders search input placeholder", () => {

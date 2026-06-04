@@ -47,6 +47,8 @@ const INITIAL_STATE: WizardState = {
 
 export const ImportWizard: Component<ImportWizardProps> = (props) => {
   const [step, setStep] = createSignal(1);
+  // Bumped on retry to remount the progress step and re-run the import.
+  const [attempt, setAttempt] = createSignal(0);
   const [state, setState] = createStore<WizardState>({ ...INITIAL_STATE });
 
   const handleSourceSelect = (source: ImportSource) => {
@@ -81,8 +83,12 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
   };
 
   const handleRetry = () => {
-    setState({ ...INITIAL_STATE });
-    setStep(1);
+    // Retry the IMPORT, not the whole wizard: keep the chosen source, file,
+    // password, validation report and skip choices intact — clear only the
+    // result and remount the progress step so it re-runs the import. (Previously
+    // this reset everything to step 1, forcing the user to re-pick and re-validate.)
+    setState({ summary: null, error: null });
+    setAttempt((a) => a + 1);
   };
 
   const back = () => {
@@ -116,19 +122,22 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
             />
           </Match>
           <Match when={step() === 4}>
-            <ImportProgressStep
-              source={state.source!}
-              fileData={state.fileData!}
-              password={state.password}
-              skipIndices={state.skipIndices}
-              report={state.report!}
-              onComplete={handleImportComplete}
-              onError={handleImportError}
-              onRetry={handleRetry}
-              onDone={() => props.onComplete(state.summary?.imported)}
-              summary={state.summary}
-              error={state.error}
-            />
+            {/* Keyed on `attempt` so "Try again" remounts and re-runs the import. */}
+            <Show when={`attempt-${attempt()}`} keyed>
+              <ImportProgressStep
+                source={state.source!}
+                fileData={state.fileData!}
+                password={state.password}
+                skipIndices={state.skipIndices}
+                report={state.report!}
+                onComplete={handleImportComplete}
+                onError={handleImportError}
+                onRetry={handleRetry}
+                onDone={() => props.onComplete(state.summary?.imported)}
+                summary={state.summary}
+                error={state.error}
+              />
+            </Show>
           </Match>
         </Switch>
       </div>

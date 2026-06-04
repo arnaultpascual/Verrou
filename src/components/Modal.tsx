@@ -12,6 +12,8 @@ export interface ModalProps {
   onClose: () => void;
   /** Dialog title (required for accessibility) */
   title: string;
+  /** Panel max-width: sm 400px / md 480px / lg 640px (default "md") */
+  size?: "sm" | "md" | "lg";
   /** Whether clicking the overlay closes the dialog (default true) */
   closeOnOverlayClick?: boolean;
   /** Dialog body content */
@@ -22,12 +24,19 @@ export interface ModalProps {
   class?: string;
 }
 
+const SIZE_CLASS: Record<NonNullable<ModalProps["size"]>, string> = {
+  sm: styles.sizeSm,
+  md: styles.sizeMd,
+  lg: styles.sizeLg,
+};
+
 export const Modal: Component<ModalProps> = (props) => {
   const [local] = splitProps(props, [
-    "open", "onClose", "title", "closeOnOverlayClick", "children", "actions", "class",
+    "open", "onClose", "title", "size", "closeOnOverlayClick", "children", "actions", "class",
   ]);
 
   const closeOnOverlay = () => local.closeOnOverlayClick ?? true;
+  const sizeClass = () => SIZE_CLASS[local.size ?? "md"];
 
   const handleInteractOutside = (e: Event) => {
     if (!closeOnOverlay()) {
@@ -40,7 +49,7 @@ export const Modal: Component<ModalProps> = (props) => {
       <Dialog.Portal>
         <Dialog.Overlay class={styles.overlay} />
         <Dialog.Content
-          class={`${styles.content} ${local.class ?? ""}`.trim()}
+          class={`${styles.content} ${sizeClass()} ${local.class ?? ""}`.trim()}
           onInteractOutside={handleInteractOutside}
         >
           <div class={styles.header}>

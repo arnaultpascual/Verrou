@@ -6,8 +6,11 @@ import { formatTotpCode } from "./formatCode";
 import { TypeBadge } from "./TypeBadge";
 import { useCopyOtp } from "./useCopyOtp";
 import { useTotpCode } from "./useTotpCode";
+import { useToast } from "../../components/useToast";
+import { clipboardAutoClearMs } from "../../stores/preferencesStore";
 import type { RecoveryStatsMap } from "../recovery/ipc";
 import type { EntryMetadataDto } from "./ipc";
+import { generateHotpCode, copyToClipboard } from "./ipc";
 import { setSearchQuery } from "../../stores/searchStore";
 import { t } from "../../stores/i18nStore";
 import styles from "./EntryCard.module.css";
@@ -95,6 +98,99 @@ const TotpLiveCode: Component<{
   );
 };
 
+/**
+ * Internal component for HOTP "Generate" → reveal + copy.
+ *
+ * HOTP is counter-based: there is no live code or countdown. Clicking
+ * "Generate" computes the *next* code (from the stored counter), copies it to
+ * the concealed, auto-clearing clipboard with the unified `reveal.copied`
+ * toast, shows it briefly, and reflects the advanced counter.
+ */
+const HotpGenerateCode: Component<{
+  entryId: string;
+  entryName: string;
+  digits: number;
+  onCopied?: () => void;
+}> = (props) => {
+  const toast = useToast();
+  const [code, setCode] = createSignal("");
+  const [counter, setCounter] = createSignal<number | null>(null);
+  const [isGenerating, setIsGenerating] = createSignal(false);
+
+  const generate = async () => {
+    if (isGenerating()) return;
+    setIsGenerating(true);
+    try {
+      const result = await generateHotpCode(props.entryId);
+      setCode(result.code);
+      // result.counter is the value the code was generated from; the stored
+      // counter is now advanced to result.counter + 1.
+      setCounter(result.counter + 1);
+      await copyToClipboard(result.code);
+      const seconds = Math.round(clipboardAutoClearMs() / 1000);
+      toast.success(t("reveal.copied", { label: props.entryName, seconds: String(seconds) }));
+      props.onCopied?.();
+    } catch {
+      toast.error(t("reveal.copyFailed", { label: props.entryName }));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    void generate();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      void generate();
+    }
+  };
+
+  return (
+    <div class={styles.hotpZone}>
+      <Show
+        when={code()}
+        fallback={
+          <button
+            class={styles.generateBtn}
+            type="button"
+            data-testid="hotp-generate"
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+          >
+            <Icon name="refresh" size={14} />
+            {t("entries.card.generate")}
+          </button>
+        }
+      >
+        <button
+          class={`${styles.codeZone} ${styles.codeZoneCopyable}`}
+          type="button"
+          aria-live="polite"
+          title={t("entries.card.regenerate")}
+          data-testid="hotp-generate"
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+        >
+          <span class={styles.liveCode} data-testid="hotp-code">
+            {formatTotpCode(code(), props.digits)}
+          </span>
+          <Icon name="refresh" size={14} class={styles.regenIcon} />
+        </button>
+        <Show when={counter() !== null}>
+          <span class={styles.hotpCounter} data-testid="hotp-counter">
+            {t("entries.card.counterValue", { counter: String(counter()) })}
+          </span>
+        </Show>
+      </Show>
+    </div>
+  );
+};
+
 export const EntryCard: Component<EntryCardProps> = (props) => {
   const [copied, setCopied] = createSignal(false);
 
@@ -109,6 +205,10 @@ export const EntryCard: Component<EntryCardProps> = (props) => {
       if (props.entry.entryType === "totp") {
         const copyTrigger = (e.currentTarget as HTMLElement).querySelector('[data-testid="copy-trigger"]') as HTMLElement | null;
         copyTrigger?.click();
+      } else if (props.entry.entryType === "hotp") {
+        // HOTP: Enter/Space generates + copies the next code (mirrors TOTP copy).
+        const generateTrigger = (e.currentTarget as HTMLElement).querySelector('[data-testid="hotp-generate"]') as HTMLElement | null;
+        generateTrigger?.click();
       } else {
         props.onSelect?.(props.entry.id);
       }
@@ -181,9 +281,12 @@ export const EntryCard: Component<EntryCardProps> = (props) => {
             </Show>
           </Match>
           <Match when={props.entry.entryType === "hotp"}>
-            <div class={styles.codeZone}>
-              <span class={styles.code}>{formatPlaceholder(props.entry.digits)}</span>
-            </div>
+            <HotpGenerateCode
+              entryId={props.entry.id}
+              entryName={props.entry.name}
+              digits={props.entry.digits}
+              onCopied={handleCopied}
+            />
           </Match>
           <Match when={props.entry.entryType === "seed_phrase"}>
             <div class={styles.seedZone}>

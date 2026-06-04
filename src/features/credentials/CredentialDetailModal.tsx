@@ -1,13 +1,15 @@
 import type { Component } from "solid-js";
-import { Show, For, createSignal, createEffect, on, onCleanup, createResource } from "solid-js";
+import { Show, For, createSignal, createEffect, on, createResource } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/Button";
 import { ReAuthPrompt } from "../../components/ReAuthPrompt";
+import { AutoHideCountdown } from "../../components/AutoHideCountdown";
 import { Icon } from "../../components/Icon";
-import { useToast } from "../../components/useToast";
-import { revealPassword, copyToClipboard, generateTotpCode } from "../entries/ipc";
+import { revealPassword, generateTotpCode } from "../entries/ipc";
 import type { CredentialDisplay, TotpCodeDto } from "../entries/ipc";
+import { useReveal } from "../entries/useReveal";
+import { useRevealCopy } from "../entries/useRevealCopy";
 import { listFolders } from "../folders/ipc";
 import { getTemplateById } from "./templates";
 import { AttachmentsSection } from "../attachments/AttachmentsSection";
@@ -30,8 +32,6 @@ export interface CredentialDetailModalProps {
   onEdit?: (entryId: string) => void;
   onDeleted?: () => void;
 }
-
-const AUTO_HIDE_SECONDS = 30;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,10 +60,10 @@ function formatTotpCode(code: string): string {
 // ---------------------------------------------------------------------------
 
 export const CredentialDetailModal: Component<CredentialDetailModalProps> = (props) => {
-  const toast = useToast();
-  const [revealedData, setRevealedData] = createSignal<CredentialDisplay | null>(null);
-  const [showReAuth, setShowReAuth] = createSignal(false);
-  const [remaining, setRemaining] = createSignal(AUTO_HIDE_SECONDS);
+  const copyReveal = useRevealCopy();
+
+  // Per-field show/hide state lives locally — the reveal grammar owns the
+  // password reveal + auto-hide, but these toggles are credential-specific.
   const [historyVisible, setHistoryVisible] = createStore<Record<number, boolean>>({});
   const [customFieldVisible, setCustomFieldVisible] = createStore<Record<number, boolean>>({});
   const [totpCode, setTotpCode] = createSignal<TotpCodeDto | null>(null);
@@ -75,55 +75,10 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
     return all.find((f) => f.id === props.folderId)?.name;
   };
 
-  let timerHandle: ReturnType<typeof setInterval> | undefined;
-  let totpHandle: ReturnType<typeof setInterval> | undefined;
-
-  // ── Reset on open ──
-
-  createEffect(
-    on(
-      () => props.open,
-      (open) => {
-        if (open) {
-          setRevealedData(null);
-          setShowReAuth(false);
-          setRemaining(AUTO_HIDE_SECONDS);
-          setHistoryVisible({});
-          setCustomFieldVisible({});
-          setTotpCode(null);
-          if (timerHandle) clearInterval(timerHandle);
-          if (totpHandle) clearInterval(totpHandle);
-        }
-      },
-    ),
-  );
-
-  onCleanup(() => {
-    if (timerHandle) clearInterval(timerHandle);
-    if (totpHandle) clearInterval(totpHandle);
-  });
-
-  // ── Auto-hide timer ──
-
-  const startAutoHide = () => {
-    setRemaining(AUTO_HIDE_SECONDS);
-    if (timerHandle) clearInterval(timerHandle);
-    timerHandle = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerHandle);
-          timerHandle = undefined;
-          setRevealedData(null);
-          setHistoryVisible({});
-          setCustomFieldVisible({});
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   // ── Linked TOTP polling ──
+  // The polling interval handle stays LOCAL to the component; the reveal hook
+  // only knows to start/stop it via onReveal/onHide.
+  let totpHandle: ReturnType<typeof setInterval> | undefined;
 
   const startTotpPolling = (linkedTotpId: string) => {
     const fetchCode = async () => {
@@ -134,83 +89,79 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
         // Linked entry may have been deleted — silently ignore
       }
     };
-    fetchCode();
+    void fetchCode();
     if (totpHandle) clearInterval(totpHandle);
-    totpHandle = setInterval(fetchCode, 1000);
+    totpHandle = setInterval(() => void fetchCode(), 1000);
   };
 
-  // ── Reveal flow ──
-
-  const handleRevealRequest = () => {
-    setShowReAuth(true);
-  };
-
-  const handleVerified = async (password: string) => {
-    // Throws on wrong password — ReAuthPrompt shows the error inline and retries.
-    const data = await revealPassword(props.entryId, password);
-    setRevealedData(data);
-    startAutoHide();
-    // Start TOTP polling if linked
-    if (data.linkedTotpId) {
-      startTotpPolling(data.linkedTotpId);
-    }
-    setShowReAuth(false);
-  };
-
-  const handleHide = () => {
-    if (timerHandle) clearInterval(timerHandle);
-    timerHandle = undefined;
+  const stopTotpPolling = () => {
     if (totpHandle) clearInterval(totpHandle);
     totpHandle = undefined;
-    setRevealedData(null);
-    setHistoryVisible({});
-    setCustomFieldVisible({});
-    setTotpCode(null);
   };
 
-  // ── Copy handlers ──
+  // ── Shared reveal grammar ──
+  // Re-auth gate, unified 60s auto-hide, clear-on-lock, clear-on-cleanup. The
+  // password only appears after re-auth via revealPassword. On reveal we kick
+  // off linked-TOTP polling; on hide we stop it and reset per-field visibility.
+  const reveal = useReveal<CredentialDisplay>({
+    revealFn: (password) => revealPassword(props.entryId, password),
+    onReveal: (data) => {
+      if (data.linkedTotpId) startTotpPolling(data.linkedTotpId);
+    },
+    onHide: () => {
+      stopTotpPolling();
+      setHistoryVisible({});
+      setCustomFieldVisible({});
+      setTotpCode(null);
+    },
+  });
 
-  const handleCopyUsername = async () => {
-    const data = revealedData();
-    if (data?.username) {
-      await copyToClipboard(data.username);
-      toast.success(t("credentials.detail.usernameCopied"));
-    }
+  // ── Reset on open ──
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (open) {
+          reveal.hide();
+          reveal.cancelReAuth();
+          setHistoryVisible({});
+          setCustomFieldVisible({});
+        }
+      },
+    ),
+  );
+
+  // ── Copy handlers (unified reveal-copy grammar) ──
+
+  const handleCopyUsername = () => {
+    const data = reveal.revealed();
+    if (data?.username) void copyReveal(data.username, t("credentials.detail.usernameLabel"));
   };
 
-  const handleCopyPassword = async () => {
-    const data = revealedData();
-    if (data?.password) {
-      await copyToClipboard(data.password);
-      toast.success(t("credentials.detail.passwordCopied"));
-    }
+  const handleCopyPassword = () => {
+    const data = reveal.revealed();
+    if (data?.password) void copyReveal(data.password, t("credentials.detail.passwordLabel"));
   };
 
-  const handleCopyHistory = async (password: string, dateStr: string) => {
-    await copyToClipboard(password);
-    toast.success(t("credentials.detail.historyCopied", { date: formatDate(dateStr) }));
+  const handleCopyHistory = (password: string) => {
+    // A history entry is still a password; reuse the existing password label so
+    // the unified copy toast reads "Password copied · clears in {n}s".
+    void copyReveal(password, t("credentials.detail.passwordLabel"));
   };
 
-  const handleCopyTotp = async () => {
+  const handleCopyTotp = () => {
     const code = totpCode();
-    if (code) {
-      await copyToClipboard(code.code);
-      toast.success(t("credentials.detail.totpCopied"));
-    }
+    if (code) void copyReveal(code.code, t("credentials.detail.linkedTotpLabel"));
   };
 
   // ── Close ──
 
   const handleClose = () => {
-    if (timerHandle) clearInterval(timerHandle);
-    if (totpHandle) clearInterval(totpHandle);
-    timerHandle = undefined;
-    totpHandle = undefined;
-    setRevealedData(null);
-    setShowReAuth(false);
+    // Clear any revealed secret + close the re-auth prompt before closing.
+    reveal.hide();
+    reveal.cancelReAuth();
     setHistoryVisible({});
     setCustomFieldVisible({});
-    setTotpCode(null);
     props.onClose();
   };
 
@@ -272,7 +223,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
               <span class={styles.metaLabel}>{t("credentials.detail.addedLabel")}</span>
               <span class={styles.metaValue}>{formatDate(props.createdAt)}</span>
             </div>
-            <Show when={revealedData()?.template}>
+            <Show when={reveal.revealed()?.template}>
               {(templateId) => {
                 const tmpl = () => getTemplateById(templateId());
                 return (
@@ -315,14 +266,14 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
             <span class={styles.sectionLabel}>{t("credentials.detail.password")}</span>
             <div class={styles.secretRow}>
               <Show
-                when={revealedData()}
+                when={reveal.revealed()}
                 fallback={
                   <>
                     <span class={`${styles.secretValue} ${styles.masked}`}>{"••••••••"}</span>
                     <button
                       type="button"
                       class={styles.revealBtn}
-                      onClick={handleRevealRequest}
+                      onClick={reveal.request}
                       aria-label={t("credentials.detail.revealAria")}
                       data-testid="credential-reveal-btn"
                     >
@@ -333,7 +284,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
                 }
               >
                 <span class={styles.secretValue} data-testid="credential-password-revealed">
-                  {revealedData()!.password}
+                  {reveal.revealed()!.password}
                 </span>
                 <button
                   type="button"
@@ -347,7 +298,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
                 <button
                   type="button"
                   class={styles.revealBtn}
-                  onClick={handleHide}
+                  onClick={reveal.hide}
                   aria-label={t("credentials.detail.hideAria")}
                   data-testid="credential-hide-btn"
                 >
@@ -356,21 +307,21 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
                 </button>
               </Show>
             </div>
-            <Show when={revealedData()}>
-              <div class={styles.timer} aria-live="polite">
-                <Icon name="clock" size={12} />
-                <span>{t("credentials.detail.hidingIn", { seconds: remaining() })}</span>
-              </div>
+            <Show when={reveal.revealed()}>
+              <AutoHideCountdown
+                remainingMs={reveal.remainingMs()}
+                onHide={reveal.hide}
+              />
             </Show>
           </div>
 
           {/* ── Username Section ── */}
-          <Show when={revealedData()?.username}>
+          <Show when={reveal.revealed()?.username}>
             <div>
               <span class={styles.sectionLabel}>{t("credentials.detail.username")}</span>
               <div class={styles.secretRow}>
                 <span class={styles.secretValue} data-testid="credential-username">
-                  {revealedData()!.username}
+                  {reveal.revealed()!.username}
                 </span>
                 <button
                   type="button"
@@ -386,11 +337,11 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
           </Show>
 
           {/* ── URLs Section ── */}
-          <Show when={revealedData()?.urls && revealedData()!.urls.length > 0}>
+          <Show when={reveal.revealed()?.urls && reveal.revealed()!.urls.length > 0}>
             <div>
               <span class={styles.sectionLabel}>{t("credentials.detail.urls")}</span>
               <div class={styles.urlList}>
-                <For each={revealedData()!.urls}>
+                <For each={reveal.revealed()!.urls}>
                   {(url) => (
                     <span class={styles.urlItem} data-testid="credential-url">
                       {url}
@@ -402,7 +353,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
           </Show>
 
           {/* ── Linked TOTP ── */}
-          <Show when={revealedData()?.linkedTotpId && totpCode()}>
+          <Show when={reveal.revealed()?.linkedTotpId && totpCode()}>
             <div>
               <span class={styles.sectionLabel}>{t("credentials.detail.linkedTotp")}</span>
               <div class={styles.totpInline}>
@@ -423,21 +374,21 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
           </Show>
 
           {/* ── Notes Section ── */}
-          <Show when={revealedData()?.notes}>
+          <Show when={reveal.revealed()?.notes}>
             <div>
               <span class={styles.sectionLabel}>{t("credentials.detail.notes")}</span>
               <p class={styles.notesContent} data-testid="credential-notes">
-                {revealedData()!.notes}
+                {reveal.revealed()!.notes}
               </p>
             </div>
           </Show>
 
           {/* ── Custom Fields Section ── */}
-          <Show when={revealedData()?.customFields && revealedData()!.customFields.length > 0}>
+          <Show when={reveal.revealed()?.customFields && reveal.revealed()!.customFields.length > 0}>
             <div>
               <span class={styles.sectionLabel}>{t("credentials.detail.customFields")}</span>
               <div class={styles.metadata}>
-                <For each={revealedData()!.customFields}>
+                <For each={reveal.revealed()!.customFields}>
                   {(field, index) => (
                     <div class={styles.customFieldRow}>
                       <span class={styles.customFieldLabel}>{field.label}</span>
@@ -473,8 +424,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
                           class={styles.copyBtn}
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyToClipboard(field.value);
-                            toast.success(t("credentials.detail.fieldCopied", { name: field.label }));
+                            void copyReveal(field.value, field.label);
                           }}
                           aria-label={t("credentials.detail.copyFieldAria", { name: field.label })}
                         >
@@ -491,12 +441,12 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
           <hr class={styles.separator} />
 
           {/* ── Password History Section ── */}
-          <Show when={revealedData()?.passwordHistory && revealedData()!.passwordHistory.length > 0}>
+          <Show when={reveal.revealed()?.passwordHistory && reveal.revealed()!.passwordHistory.length > 0}>
             <div class={styles.historySection}>
               <span class={styles.sectionLabel}>
-                {t("credentials.detail.passwordHistory", { count: revealedData()!.passwordHistory.length })}
+                {t("credentials.detail.passwordHistory", { count: reveal.revealed()!.passwordHistory.length })}
               </span>
-              <For each={revealedData()!.passwordHistory}>
+              <For each={reveal.revealed()!.passwordHistory}>
                 {(entry, index) => (
                   <div class={styles.historyRow} data-testid="credential-history-row">
                     <span class={styles.historyDate}>{formatDate(entry.changedAt)}</span>
@@ -523,7 +473,7 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
                       class={styles.historyCopy}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleCopyHistory(entry.password, entry.changedAt);
+                        handleCopyHistory(entry.password);
                       }}
                       aria-label={t("credentials.detail.copyHistoryAria", { date: formatDate(entry.changedAt) })}
                     >
@@ -542,9 +492,9 @@ export const CredentialDetailModal: Component<CredentialDetailModalProps> = (pro
 
       {/* Re-auth modal (stacks on top of detail modal) */}
       <ReAuthPrompt
-        open={showReAuth()}
-        onClose={() => setShowReAuth(false)}
-        onVerified={handleVerified}
+        open={reveal.showReAuth()}
+        onClose={reveal.cancelReAuth}
+        onVerified={reveal.onVerified}
       />
     </>
   );

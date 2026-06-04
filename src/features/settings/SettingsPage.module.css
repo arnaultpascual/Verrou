@@ -27,6 +27,37 @@
   margin: 0;
 }
 
+/* ── Grouped sections (Security / Appearance / Backup & Transfer) ── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.groupTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-xs);
+  margin: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: var(--border-default);
+}
+
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.subsectionTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
 .sectionDescription {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);

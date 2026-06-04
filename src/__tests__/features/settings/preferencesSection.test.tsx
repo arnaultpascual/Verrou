@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock preferences store
+// (auto-lock timeout moved to SecurityPreferences — see securityPreferences.test.tsx)
 let mockTheme = "system";
-let mockTimeout = 15;
 let mockLaunchOnBoot = false;
 let mockStartMinimized = false;
 let mockLoaded = true;
@@ -10,7 +10,6 @@ const mockUpdatePreferences = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../stores/preferencesStore", () => ({
   currentTheme: () => mockTheme,
-  autoLockTimeoutMinutes: () => mockTimeout,
   launchOnBoot: () => mockLaunchOnBoot,
   startMinimized: () => mockStartMinimized,
   preferencesLoaded: () => mockLoaded,
@@ -45,7 +44,6 @@ describe("PreferencesSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTheme = "system";
-    mockTimeout = 15;
     mockLaunchOnBoot = false;
     mockStartMinimized = false;
     mockLoaded = true;
@@ -82,24 +80,6 @@ describe("PreferencesSection", () => {
     const { getByTestId } = render(() => <PreferencesSection />);
     fireEvent.click(getByTestId("theme-dark"));
     expect(mockUpdatePreferences).toHaveBeenCalledWith({ theme: "dark" });
-  });
-
-  it("renders lock timeout slider", () => {
-    const { getByTestId } = render(() => <PreferencesSection />);
-    expect(getByTestId("lock-timeout")).toBeDefined();
-  });
-
-  it("shows current timeout value", () => {
-    mockTimeout = 30;
-    const { getByTestId } = render(() => <PreferencesSection />);
-    expect(getByTestId("timeout-value").textContent).toContain("30 min");
-  });
-
-  it("calls updatePreferences when timeout slider changes", () => {
-    const { container } = render(() => <PreferencesSection />);
-    const slider = container.querySelector("#lock-timeout-slider") as HTMLInputElement;
-    fireEvent.input(slider, { target: { value: "25" } });
-    expect(mockUpdatePreferences).toHaveBeenCalledWith({ autoLockTimeoutMinutes: 25 });
   });
 
   it("renders startup behavior toggles", () => {

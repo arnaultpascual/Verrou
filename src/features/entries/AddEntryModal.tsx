@@ -22,12 +22,14 @@ export interface AddEntryModalProps {
 }
 
 const INITIAL_FORM: AddEntryFormState = {
+  entryType: "totp",
   secret: "",
   name: "",
   issuer: "",
   algorithm: "SHA1",
   digits: 6,
   period: 30,
+  counter: 0,
   pasteInput: "",
   pasteDetected: null,
   showManualForm: false,
@@ -93,12 +95,14 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
     if (result.type === "uri") {
       const p = result.parsed;
       setForm({
+        entryType: p.type,
         secret: p.secret,
         name: p.name,
         issuer: p.issuer,
         algorithm: p.algorithm,
         digits: p.digits,
         period: p.period,
+        counter: p.counter,
         pasteDetected: "uri",
         showManualForm: true,
       });
@@ -154,6 +158,16 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
     }
   };
 
+  const handleTypeToggle = (type: "totp" | "hotp") => {
+    setForm("entryType", type);
+  };
+
+  const handleCounterInput = (value: string) => {
+    // Parse to a non-negative integer; empty/invalid → 0.
+    const n = parseInt(value, 10);
+    setForm("counter", Number.isFinite(n) && n >= 0 ? n : 0);
+  };
+
   const handleSave = async () => {
     const errors = validateEntryForm(form);
     if (Object.keys(errors).length > 0) {
@@ -163,14 +177,18 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
 
     setForm("isSubmitting", true);
     try {
+      const isHotp = form.entryType === "hotp";
       const result = await addEntry({
-        entryType: "totp",
+        entryType: form.entryType,
         name: form.name.trim(),
         issuer: form.issuer.trim() || undefined,
         secret: form.secret.replace(/\s/g, "").toUpperCase(),
         algorithm: form.algorithm,
         digits: form.digits,
-        period: form.period,
+        // HOTP is counter-based: send the initial counter and omit the
+        // time-based period. TOTP sends the period and ignores counter.
+        period: isHotp ? undefined : form.period,
+        counter: isHotp ? form.counter : undefined,
         folderId: folderId() || undefined,
       });
       toast.success(t("entries.add.success", { name: result.name }));
@@ -272,6 +290,34 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
         <Show when={showFields()}>
           <hr class={styles.separator} />
           <div class={styles.fieldGroup}>
+            {/* Type toggle — time-based (TOTP) vs counter-based (HOTP) */}
+            <div
+              class={styles.typeToggle}
+              role="radiogroup"
+              aria-label={t("entries.add.typeLabel")}
+            >
+              <button
+                type="button"
+                class={`${styles.typeOption} ${form.entryType === "totp" ? styles.typeOptionActive : ""}`}
+                role="radio"
+                aria-checked={form.entryType === "totp"}
+                data-testid="type-toggle-totp"
+                onClick={() => handleTypeToggle("totp")}
+              >
+                {t("entries.add.typeTotp")}
+              </button>
+              <button
+                type="button"
+                class={`${styles.typeOption} ${form.entryType === "hotp" ? styles.typeOptionActive : ""}`}
+                role="radio"
+                aria-checked={form.entryType === "hotp"}
+                data-testid="type-toggle-hotp"
+                onClick={() => handleTypeToggle("hotp")}
+              >
+                {t("entries.add.typeHotp")}
+              </button>
+            </div>
+
             <Input
               label={t("entries.add.accountLabel")}
               value={form.name}
@@ -315,6 +361,18 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
                 </For>
               </select>
             </div>
+
+            {/* Initial counter — HOTP only (event-based, no time period) */}
+            <Show when={form.entryType === "hotp"}>
+              <Input
+                label={t("entries.add.counterLabel")}
+                type="number"
+                value={String(form.counter)}
+                onInput={handleCounterInput}
+                placeholder={t("entries.add.counterPlaceholder")}
+                hint={t("entries.add.counterHint")}
+              />
+            </Show>
 
             {/* Advanced Settings */}
             <button
@@ -368,23 +426,26 @@ export const AddEntryModal: Component<AddEntryModalProps> = (props) => {
                   </select>
                 </div>
 
-                <div class={styles.selectWrapper}>
-                  <label class={styles.selectLabel} for="select-period">
-                    {t("entries.add.periodLabel")}
-                  </label>
-                  <select
-                    id="select-period"
-                    class={styles.select}
-                    value={form.period}
-                    onChange={(e) =>
-                      setForm("period", Number(e.currentTarget.value) as OtpPeriod)
-                    }
-                  >
-                    <option value="15">{t("entries.add.period15")}</option>
-                    <option value="30">{t("entries.add.period30")}</option>
-                    <option value="60">{t("entries.add.period60")}</option>
-                  </select>
-                </div>
+                {/* Period is time-based — TOTP only. HOTP advances by counter. */}
+                <Show when={form.entryType === "totp"}>
+                  <div class={styles.selectWrapper}>
+                    <label class={styles.selectLabel} for="select-period">
+                      {t("entries.add.periodLabel")}
+                    </label>
+                    <select
+                      id="select-period"
+                      class={styles.select}
+                      value={form.period}
+                      onChange={(e) =>
+                        setForm("period", Number(e.currentTarget.value) as OtpPeriod)
+                      }
+                    >
+                      <option value="15">{t("entries.add.period15")}</option>
+                      <option value="30">{t("entries.add.period30")}</option>
+                      <option value="60">{t("entries.add.period60")}</option>
+                    </select>
+                  </div>
+                </Show>
               </div>
             </Show>
           </div>

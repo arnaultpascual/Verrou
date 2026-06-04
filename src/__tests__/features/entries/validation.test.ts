@@ -7,12 +7,14 @@ import {
 
 function makeFormState(overrides: Partial<AddEntryFormState> = {}): AddEntryFormState {
   return {
+    entryType: "totp",
     secret: "JBSWY3DPEHPK3PXP",
     name: "My Account",
     issuer: "",
     algorithm: "SHA1",
     digits: 6,
     period: 30,
+    counter: 0,
     pasteInput: "",
     pasteDetected: null,
     showManualForm: false,

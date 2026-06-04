@@ -54,12 +54,13 @@ describe("HardwareSecurityStatus", () => {
     const { findByTestId } = render(() => <HardwareSecurityStatus />);
 
     const msg = await findByTestId("hw-unavailable");
-    expect(msg.textContent).toContain(
-      "Hardware security (Secure Enclave/TPM) is not available"
-    );
+    // Primary message is plain-language (no acronyms)…
+    expect(msg.textContent).toContain("This device has no security chip");
     expect(msg.textContent).toContain(
       "Your vault key is protected by software encryption only"
     );
+    // …and the raw acronyms are relocated to the secondary hint.
+    expect(msg.textContent).toContain("Secure Enclave / TPM");
   });
 
   it("shows provider name and active status when enabled", async () => {

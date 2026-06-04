@@ -36,8 +36,17 @@
 }
 
 .value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
+}
+
+.tech {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   font-family: var(--font-mono);
 }
 

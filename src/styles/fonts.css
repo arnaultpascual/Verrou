@@ -1,0 +1,56 @@
+/* Self-hosted fonts — bundled locally as .woff2 (zero-network safe).
+ *
+ * Cipher DA: Space Grotesk (UI + display) + JetBrains Mono (codes / secrets /
+ * labels). OFL-licensed, GPL-compatible.
+ * NEVER point @font-face at a CDN: a remote font request would break the
+ * zero-network invariant (and the CI network-isolation check).
+ */
+
+/* stylelint-disable declaration-property-value-disallowed-list --
+   @font-face descriptors require literal font-weight values (tokens can't be used here). */
+
+/* ── Space Grotesk (UI + display) ── */
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/space-grotesk-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/space-grotesk-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/space-grotesk-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/space-grotesk-latin-700-normal.woff2") format("woff2");
+}
+
+/* ── JetBrains Mono (codes, seed words, recovery keys, fingerprints) ── */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2");
+}

@@ -1,10 +1,11 @@
 import type { Component } from "solid-js";
-import { Show, createSignal, createEffect, on, onCleanup } from "solid-js";
+import { createSignal, createEffect, on, onCleanup } from "solid-js";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { ReAuthPrompt } from "../../components/ReAuthPrompt";
 import { useToast } from "../../components/useToast";
-import { getEntry, copyToClipboard } from "./ipc";
+import { getEntry, revealOtpSecret, copyToClipboard } from "./ipc";
 import { buildOtpAuthUri } from "./otpauth";
 import { QrCode } from "./QrCode";
 import { t } from "../../stores/i18nStore";
@@ -19,51 +20,51 @@ export interface ExportUriModalProps {
   entryType: string;
 }
 
+/**
+ * Export an OTP account as an `otpauth://` URI + QR code.
+ *
+ * The raw secret never comes from `get_entry` (which withholds it). It is
+ * fetched only through the re-authenticated `revealOtpSecret` path, so the
+ * modal opens on a {@link ReAuthPrompt} gate and reveals the URI/QR only after
+ * the master password is confirmed.
+ */
 export const ExportUriModal: Component<ExportUriModalProps> = (props) => {
   const toast = useToast();
   const [uri, setUri] = createSignal("");
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal("");
 
-  // Fetch entry detail and build URI when modal opens
+  // AC #4: never leave a revealed secret in the DOM once the modal closes.
   createEffect(
     on(
       () => props.open,
-      async (open) => {
-        if (!open) {
-          // AC #4: Clear URI from DOM on close
-          setUri("");
-          setError("");
-          return;
-        }
-
-        setLoading(true);
-        setError("");
-        try {
-          const detail = await getEntry(props.entryId);
-          const otpauthUri = buildOtpAuthUri({
-            type: detail.entryType as "totp" | "hotp",
-            name: detail.name,
-            issuer: detail.issuer,
-            secret: detail.secret,
-            algorithm: detail.algorithm,
-            digits: detail.digits,
-            period: detail.period,
-            counter: detail.counter,
-          });
-          setUri(otpauthUri);
-        } catch (err) {
-          setError(typeof err === "string" ? err : t("entries.exportUri.loadError"));
-        } finally {
-          setLoading(false);
-        }
+      (open) => {
+        if (!open) setUri("");
       },
     ),
   );
 
-  onCleanup(() => {
-    setUri("");
-  });
+  onCleanup(() => setUri(""));
+
+  // Re-authenticate, fetch the raw secret, and build the otpauth:// URI.
+  // Rejects on a wrong password so ReAuthPrompt surfaces the error inline and
+  // keeps itself open for retry — the URI is only set on real success.
+  const handleVerified = async (password: string) => {
+    const [detail, secret] = await Promise.all([
+      getEntry(props.entryId),
+      revealOtpSecret(props.entryId, password),
+    ]);
+    setUri(
+      buildOtpAuthUri({
+        type: detail.entryType as "totp" | "hotp",
+        name: detail.name,
+        issuer: detail.issuer,
+        secret,
+        algorithm: detail.algorithm,
+        digits: detail.digits,
+        period: detail.period,
+        counter: detail.counter,
+      }),
+    );
+  };
 
   const handleCopy = async () => {
     const currentUri = uri();
@@ -77,34 +78,29 @@ export const ExportUriModal: Component<ExportUriModalProps> = (props) => {
   };
 
   return (
-    <Modal
-      open={props.open}
-      onClose={props.onClose}
-      title={t("entries.exportUri.title")}
-      closeOnOverlayClick={false}
-    >
-      {/* Warning (AC #2) */}
-      <div class={styles.warning}>
-        <Icon name="alert" size={16} class={styles.warningIcon} />
-        <p class={styles.warningText}>
-          {t("entries.exportUri.warning", { name: props.name })}
-        </p>
-      </div>
+    <>
+      {/* Re-auth gate — the raw secret is re-auth-protected (export tier). */}
+      <ReAuthPrompt
+        open={props.open && !uri()}
+        onClose={props.onClose}
+        onVerified={handleVerified}
+      />
 
-      <Show when={loading()}>
-        <div class={styles.loading}>
-          <Icon name="spinner" size={24} />
-          <span>{t("entries.exportUri.loading")}</span>
+      {/* Export content — rendered only after the secret has been revealed. */}
+      <Modal
+        open={props.open && Boolean(uri())}
+        onClose={props.onClose}
+        title={t("entries.exportUri.title")}
+        closeOnOverlayClick={false}
+      >
+        {/* Warning (AC #2) */}
+        <div class={styles.warning}>
+          <Icon name="alert" size={16} class={styles.warningIcon} />
+          <p class={styles.warningText}>
+            {t("entries.exportUri.warning", { name: props.name })}
+          </p>
         </div>
-      </Show>
 
-      <Show when={error()}>
-        <p class={styles.error} role="alert">
-          {error()}
-        </p>
-      </Show>
-
-      <Show when={uri()}>
         <div class={styles.content}>
           {/* URI display */}
           <div class={styles.uriSection}>
@@ -114,11 +110,7 @@ export const ExportUriModal: Component<ExportUriModalProps> = (props) => {
                 {uri()}
               </code>
             </div>
-            <Button
-              variant="ghost"
-              onClick={handleCopy}
-              data-testid="copy-uri-btn"
-            >
+            <Button variant="ghost" onClick={handleCopy} data-testid="copy-uri-btn">
               <Icon name="copy" size={16} /> {t("entries.exportUri.copyUri")}
             </Button>
           </div>
@@ -131,13 +123,13 @@ export const ExportUriModal: Component<ExportUriModalProps> = (props) => {
             </div>
           </div>
         </div>
-      </Show>
 
-      <div class={styles.actions}>
-        <Button onClick={props.onClose} data-testid="export-uri-close">
-          {t("common.close")}
-        </Button>
-      </div>
-    </Modal>
+        <div class={styles.actions}>
+          <Button onClick={props.onClose} data-testid="export-uri-close">
+            {t("common.close")}
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 };

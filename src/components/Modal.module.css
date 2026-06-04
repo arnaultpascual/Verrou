@@ -8,30 +8,49 @@
 }
 
 /* ── Content panel ── */
+/* Flex column so the header pins to the top, the actions footer pins to the
+   bottom, and only the body scrolls. The panel itself clips overflow. */
 .content {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
   width: 90%;
   max-width: 480px;
   max-height: 85vh;
-  overflow-y: auto;
+  overflow: hidden;
   background-color: var(--color-surface-1);
   border: 1px solid var(--border-color-default);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-popup);
-  padding: var(--spacing-xl);
   animation: scaleIn var(--duration-normal) var(--easing-default);
 }
 
-/* ── Header ── */
+/* ── Size variants (max-width) ── */
+.sizeSm {
+  max-width: 400px;
+}
+
+.sizeMd {
+  max-width: 480px;
+}
+
+.sizeLg {
+  max-width: 640px;
+}
+
+/* ── Header (pinned top) ── */
 .header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-color-subtle);
 }
 
 .title {
@@ -64,19 +83,24 @@
   outline-offset: 2px;
 }
 
-/* ── Body ── */
+/* ── Body (the only scrollable region) ── */
 .body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
   color: var(--color-text-secondary);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
 }
 
-/* ── Actions ── */
+/* ── Actions (pinned bottom) ── */
 .actions {
+  flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  border-top: 1px solid var(--border-color-subtle);
 }
 
 /* ── Animations ── */
@@ -106,6 +130,7 @@
     position: static;
     transform: none;
     z-index: auto;
+    display: block;
     width: 100%;
     max-width: none;
     max-height: none;
@@ -120,5 +145,15 @@
 
   .header {
     display: none;
+  }
+
+  .body {
+    overflow: visible;
+    padding: 0;
+  }
+
+  .actions {
+    padding: 0;
+    border-top: none;
   }
 }
