@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Hardened runtime, no exceptions — least privilege for a vault app.
+
+    Verrou deliberately requests NO entitlement exceptions:
+      * It runs no in-process JIT. WKWebView executes JavaScript in Apple's
+        separately-signed `com.apple.WebKit.WebContent` process, so the host
+        app needs neither `allow-jit` nor `allow-unsigned-executable-memory`.
+      * mlock/Zeroize, Touch ID (LocalAuthentication), and per-app keychain
+        access all work for Developer ID (non-sandboxed) apps without an
+        entitlement.
+
+    If a future dependency genuinely needs one, add the single specific key
+    here and document why — never broaden blindly.
+
+    NOTE: this app is NOT sandboxed (com.apple.security.app-sandbox absent),
+    which is correct for Developer-ID-signed direct distribution.
+  -->
+</dict>
+</plist>

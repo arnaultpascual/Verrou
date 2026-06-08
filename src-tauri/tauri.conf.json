@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/v2/crates/tauri-cli/schema.json",
   "productName": "VERROU",
   "version": "0.1.0",
-  "identifier": "com.verrou.app",
+  "identifier": "com.verrou.vault",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
@@ -34,6 +34,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "entitlements.plist"
+    }
   }
 }
