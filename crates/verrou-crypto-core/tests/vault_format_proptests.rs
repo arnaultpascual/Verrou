@@ -38,6 +38,7 @@ fn prop_header() -> VaultHeader {
         total_unlock_count: 0,
         slots: vec![],
         slot_salts: vec![],
+        header_mac: None,
     }
 }
 

@@ -32,6 +32,29 @@ const MEMORY_256MB: u32 = 262_144;
 /// 128 MB in KiB — absolute minimum for VERROU.
 const MEMORY_128MB: u32 = 131_072;
 
+/// Absolute maximum Argon2id memory cost in KiB (4 GiB).
+///
+/// Upper bound enforced by [`derive`] so an untrusted or tampered vault header
+/// (e.g. a malicious `.verrou` import) cannot request an allocation so large
+/// that the process aborts on OOM — a denial of service. Legitimate presets
+/// top out at 512 MiB, far below this ceiling.
+const MAX_M_COST: u32 = 4_194_304;
+
+/// Maximum Argon2id iterations accepted by [`derive`] / chosen by calibration.
+const MAX_T_COST: u32 = 64;
+
+/// Maximum Argon2id parallelism (lanes) accepted by [`derive`].
+const MAX_P_COST: u32 = 16;
+
+/// Iteration floor — calibration never drops below the architecture baseline.
+const MIN_T_COST: u32 = 2;
+
+/// Per-tier calibration targets in milliseconds — midpoints of the documented
+/// ranges (Fast ~1 s, Balanced ~1.5–2 s, Maximum ~3–4 s).
+const TARGET_FAST_MS: u128 = 1_000;
+const TARGET_BALANCED_MS: u128 = 1_750;
+const TARGET_MAXIMUM_MS: u128 = 3_500;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -139,6 +162,11 @@ pub fn derive(
         )));
     }
 
+    // Reject out-of-range parameters before handing them to argon2. The upper
+    // memory bound prevents a tampered header / untrusted import from forcing
+    // a multi-terabyte allocation that aborts the process (DoS).
+    validate_params(params)?;
+
     let argon2_params = argon2::Params::new(
         params.m_cost,
         params.t_cost,
@@ -164,15 +192,45 @@ pub fn derive(
     Ok(result)
 }
 
+/// Validate Argon2id parameters against VERROU's accepted ranges.
+///
+/// Enforces an **upper** bound so a tampered vault header or a malicious
+/// `.verrou` import cannot request an allocation large enough to abort the
+/// process on OOM. The lower memory bound is a vault-creation *policy* and is
+/// deliberately NOT enforced here, so fast unit tests can use small parameters.
+///
+/// # Errors
+///
+/// Returns [`CryptoError::KeyDerivation`] if any parameter is out of range.
+fn validate_params(p: &Argon2idParams) -> Result<(), CryptoError> {
+    if p.m_cost > MAX_M_COST
+        || !(1..=MAX_T_COST).contains(&p.t_cost)
+        || !(1..=MAX_P_COST).contains(&p.p_cost)
+    {
+        return Err(CryptoError::KeyDerivation(format!(
+            "argon2 params out of allowed range: m_cost={} (max {MAX_M_COST}), \
+             t_cost={} (1..={MAX_T_COST}), p_cost={} (1..={MAX_P_COST})",
+            p.m_cost, p.t_cost, p.p_cost
+        )));
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Calibration
 // ---------------------------------------------------------------------------
 
 /// Benchmark the current hardware and return achievable Argon2id presets.
 ///
-/// Attempts the highest memory tier first (512 MB), cascading down to 256 MB
-/// and 128 MB if allocation fails. Iterations are compensated when memory is
-/// reduced to maintain equivalent brute-force resistance.
+/// First finds the achievable memory ceiling (512 MB → 256 MB → 128 MB) by
+/// trial allocation, then **times a real derivation** at that memory and picks
+/// the iteration count (`t_cost`) so each tier approximates its target unlock
+/// duration (Fast ~1 s, Balanced ~1.75 s, Maximum ~3.5 s). Argon2id runtime is
+/// linear in `t_cost`, so a single-iteration probe extrapolates accurately.
+///
+/// This is genuine timing calibration: on fast hardware the iteration count
+/// rises to keep per-guess brute-force cost near the target; on slow hardware
+/// it falls (clamped to a floor) so unlock stays usable.
 ///
 /// # Errors
 ///
@@ -181,34 +239,58 @@ pub fn calibrate() -> Result<CalibratedPresets, CryptoError> {
     // Determine the achievable memory ceiling by testing allocation.
     let achievable_memory = find_achievable_memory()?;
 
-    // Build presets scaled to achievable memory.
-    // Iteration compensation: scale_iterations() doubles iterations when memory is halved.
-    let fast = Argon2idParams {
-        m_cost: core::cmp::min(achievable_memory, MEMORY_256MB),
-        t_cost: scale_iterations(
-            2,
-            MEMORY_256MB,
-            core::cmp::min(achievable_memory, MEMORY_256MB),
-        ),
-        p_cost: 4,
-    };
-
-    let balanced = Argon2idParams {
-        m_cost: achievable_memory,
-        t_cost: scale_iterations(3, MEMORY_512MB, achievable_memory),
-        p_cost: 4,
-    };
-
-    let maximum = Argon2idParams {
-        m_cost: achievable_memory,
-        t_cost: scale_iterations(4, MEMORY_512MB, achievable_memory),
-        p_cost: 4,
-    };
+    // Time a real derivation at each tier's memory and pick t_cost for the
+    // target duration. The Fast tier caps memory at 256 MB per the spec.
+    let fast_memory = core::cmp::min(achievable_memory, MEMORY_256MB);
+    let fast = calibrate_tier(fast_memory, TARGET_FAST_MS)?;
+    let balanced = calibrate_tier(achievable_memory, TARGET_BALANCED_MS)?;
+    let maximum = calibrate_tier(achievable_memory, TARGET_MAXIMUM_MS)?;
 
     Ok(CalibratedPresets {
         fast,
         balanced,
         maximum,
+    })
+}
+
+/// Calibrate one tier by timing a single-iteration derivation and scaling
+/// `t_cost` toward `target_ms`.
+///
+/// Because Argon2id time is ~linear in `t_cost`, `t ≈ target / per_iteration`.
+/// The result is clamped to `[MIN_T_COST, MAX_T_COST]`. Uses checked arithmetic
+/// to satisfy the workspace `arithmetic_side_effects = deny` lint.
+///
+/// # Errors
+///
+/// Returns `CryptoError::KeyDerivation` if the probe derivation fails.
+fn calibrate_tier(m_cost: u32, target_ms: u128) -> Result<Argon2idParams, CryptoError> {
+    let probe = Argon2idParams {
+        m_cost,
+        t_cost: 1,
+        p_cost: 4,
+    };
+
+    let start = std::time::Instant::now();
+    let probe_key = derive(
+        b"verrou-calibration-probe",
+        b"verrou-calibration-salt",
+        &probe,
+    )?;
+    drop(probe_key);
+    let per_iteration_ms = start.elapsed().as_millis().max(1);
+
+    // per_iteration_ms is >= 1, so checked_div never returns None; the fallback
+    // is bound in a local to keep it out of `unwrap_or` (clippy `or_fun_call`).
+    let max_t = u128::from(MAX_T_COST);
+    let estimated = target_ms.checked_div(per_iteration_ms).unwrap_or(max_t);
+    let t_cost = u32::try_from(estimated)
+        .unwrap_or(MAX_T_COST)
+        .clamp(MIN_T_COST, MAX_T_COST);
+
+    Ok(Argon2idParams {
+        m_cost,
+        t_cost,
+        p_cost: 4,
     })
 }
 
@@ -259,20 +341,6 @@ fn try_allocation(m_cost_kib: u32) -> bool {
     });
 
     result.unwrap_or(false)
-}
-
-/// Scale iterations when memory is reduced.
-///
-/// When memory is halved, double the iterations to compensate.
-const fn scale_iterations(base_t_cost: u32, target_memory: u32, actual_memory: u32) -> u32 {
-    if actual_memory >= target_memory || actual_memory == 0 {
-        return base_t_cost;
-    }
-    // ratio = target / actual (e.g., 512/256 = 2, 512/128 = 4)
-    // We guard against actual_memory == 0 above, so this division is safe.
-    #[allow(clippy::arithmetic_side_effects)]
-    let ratio = target_memory / actual_memory;
-    base_t_cost.saturating_mul(ratio)
 }
 
 // ---------------------------------------------------------------------------
@@ -377,18 +445,53 @@ mod tests {
     }
 
     #[test]
-    fn scale_iterations_no_reduction() {
-        assert_eq!(scale_iterations(3, MEMORY_512MB, MEMORY_512MB), 3);
+    fn derive_rejects_oversized_m_cost() {
+        // F2: an untrusted header requesting a multi-terabyte allocation must be
+        // rejected up front, not handed to argon2 (which would abort on OOM).
+        let params = Argon2idParams {
+            m_cost: u32::MAX,
+            t_cost: 2,
+            p_cost: 4,
+        };
+        let err =
+            derive(b"password", TEST_SALT, &params).expect_err("oversized m_cost must be rejected");
+        assert!(
+            format!("{err}").contains("out of allowed range"),
+            "error should mention the range violation"
+        );
     }
 
     #[test]
-    fn scale_iterations_half_memory() {
-        assert_eq!(scale_iterations(3, MEMORY_512MB, MEMORY_256MB), 6);
+    fn derive_rejects_zero_t_cost() {
+        let params = Argon2idParams {
+            m_cost: 32,
+            t_cost: 0,
+            p_cost: 1,
+        };
+        assert!(derive(b"password", TEST_SALT, &params).is_err());
     }
 
     #[test]
-    fn scale_iterations_quarter_memory() {
-        assert_eq!(scale_iterations(3, MEMORY_512MB, MEMORY_128MB), 12);
+    fn validate_params_accepts_all_presets() {
+        for preset in [KdfPreset::Fast, KdfPreset::Balanced, KdfPreset::Maximum] {
+            assert!(validate_params(&preset.default_params()).is_ok());
+        }
+    }
+
+    #[test]
+    fn calibrate_produces_valid_tiers() {
+        // F1: calibration must return in-range params with iterations within the
+        // calibrated floor/ceiling, and Fast memory must not exceed Balanced.
+        let presets = calibrate().expect("calibration should succeed");
+        for p in [&presets.fast, &presets.balanced, &presets.maximum] {
+            assert!(
+                validate_params(p).is_ok(),
+                "calibrated params invalid: {p:?}"
+            );
+            assert!(p.t_cost >= MIN_T_COST && p.t_cost <= MAX_T_COST);
+        }
+        assert!(presets.fast.m_cost <= presets.balanced.m_cost);
+        assert_eq!(presets.balanced.m_cost, presets.maximum.m_cost);
     }
 
     #[test]

@@ -222,6 +222,7 @@ pub fn export_vault(
         total_unlock_count: 0,
         slots: vec![export_slot],
         slot_salts: vec![salt.to_vec()],
+        header_mac: None,
     };
 
     // Step 7: Serialize to the encrypted inner `.verrou` binary blob.

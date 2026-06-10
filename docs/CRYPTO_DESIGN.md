@@ -60,16 +60,41 @@ unlock factor ──derive──► wrapping key ──AES-256-GCM unwrap──�
   - **Biometric** → HKDF-SHA256 over a high-entropy secret held in the OS
     keychain (see "Biometric").
 
+### Header integrity (keyed MAC)
+
+The unencrypted header (KDF params, slots, salts) carries a **keyed BLAKE3 MAC**
+over its authenticated subset — `version`, `session_params`, `sensitive_params`,
+`slot_count`, slots, and slot salts. The MAC key is derived from the master key
+(`BLAKE3-KDF`, context `VERROU-HEADER-MAC-v1`), so it is computed only when the
+key is available (vault creation and every slot mutation) and **verified
+fail-closed on unlock** with a constant-time comparison. Mutable brute-force
+counters are excluded so they can update without the key.
+
+This detects at-rest tampering of metadata that a normal password-slot unwrap
+does not exercise — e.g. a downgraded `sensitive_params` or a swapped/removed
+recovery slot. Vaults created before this field adopt a MAC on first unlock
+(trust-on-first-use); the field is `serde`-optional, so old and new app versions
+stay format-compatible.
+
 ### KDF tiering
 
 Argon2id parameters are calibrated to the user's hardware at vault creation and
-stored in the vault header. Two parameter sets exist:
+stored in the vault header. Calibration finds the achievable memory ceiling
+(512 → 256 → 128 MiB by trial allocation), then **times a real derivation** and
+scales iterations so each tier approximates its target (Argon2id runtime is
+linear in `t_cost`). Two parameter sets are stored:
 
-| Tier | Target | Default params |
+| Tier | Target | Baseline params |
 |---|---|---|
-| Fast | ~1 s | 256 MiB, 2 passes, 4 lanes |
-| Balanced | ~1.5–2 s | 512 MiB, 3 passes, 4 lanes |
-| Maximum | ~3–4 s | 512 MiB, 4 passes, 4 lanes |
+| Fast | ~1 s | 256 MiB, ≥2 passes, 4 lanes |
+| Balanced | ~1.5–2 s | 512 MiB, ≥3 passes, 4 lanes |
+| Maximum | ~3–4 s | 512 MiB, ≥4 passes, 4 lanes |
+
+Iteration counts rise on fast hardware (to hold per-guess cost near the target)
+and fall on slow hardware (clamped to a floor of 2), so the table shows
+baselines, not fixed values. `derive` also rejects out-of-range parameters
+(memory capped at 4 GiB) so a tampered header or malicious import cannot force an
+allocation large enough to abort the process.
 
 The unlock delay is *real* Argon2id work (memory-hard), not an artificial delay
 — it is the brute-force cost an attacker pays per guess.

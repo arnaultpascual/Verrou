@@ -31,6 +31,7 @@ use crate::symmetric::{self, SealedData};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -61,6 +62,12 @@ const LEN_PREFIX: usize = 4;
 
 /// AAD for payload encryption — includes version for domain separation.
 const PAYLOAD_AAD: &[u8] = b"verrou-vault-payload-v1";
+
+/// BLAKE3 key-derivation context for the header MAC key (domain separation).
+pub const HEADER_MAC_CONTEXT: &str = "VERROU-HEADER-MAC-v1";
+
+/// Length of the header MAC in bytes (BLAKE3 default output).
+pub const HEADER_MAC_LEN: usize = 32;
 
 /// Minimum file size: magic + `header_len` + 0-byte header + `sealed_len` + min sealed.
 const MIN_FILE_SIZE: usize = MAGIC_LEN + LEN_PREFIX + LEN_PREFIX;
@@ -104,6 +111,135 @@ pub struct VaultHeader {
     /// wrapping key before opening the encrypted database.
     #[serde(default)]
     pub slot_salts: Vec<Vec<u8>>,
+    /// Keyed MAC (BLAKE3) over the authenticated header subset — version, KDF
+    /// params, `slot_count`, slots, and slot salts. Detects at-rest tampering of
+    /// security-critical metadata (e.g. a downgraded `sensitive_params` or a
+    /// swapped slot) that the per-slot AEAD does not exercise on a normal unlock.
+    ///
+    /// Keyed by a value derived from the master key, so it is computed/refreshed
+    /// only when the key is available (see [`compute_header_mac`]). `None` for
+    /// vaults created before this field existed — adopted on first unlock
+    /// (trust-on-first-use). Excluded from the MAC input itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header_mac: Option<Vec<u8>>,
+}
+
+// ---------------------------------------------------------------------------
+// Header MAC (tamper detection over authenticated metadata)
+// ---------------------------------------------------------------------------
+
+/// Outcome of verifying a header MAC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderMacStatus {
+    /// No MAC present — a legacy vault created before MACs existed.
+    Missing,
+    /// MAC present and matches the recomputed value.
+    Valid,
+    /// MAC present but does NOT match — the header was tampered with.
+    Invalid,
+}
+
+/// Authenticated subset of the header fed into the MAC.
+///
+/// Deliberately excludes the mutable brute-force counters (`unlock_attempts`,
+/// `last_attempt_at`, `total_unlock_count`) — those change via
+/// [`rewrite_header`] WITHOUT the master key, so MAC-ing them would be
+/// unverifiable — and excludes the MAC field itself. Serializing a fixed-field
+/// struct via `serde_json` is deterministic (declaration order, no maps), so
+/// the byte string is stable across write and verify.
+#[derive(Serialize)]
+struct AuthenticatedHeader<'a> {
+    version: u8,
+    slot_count: u8,
+    session_params: &'a Argon2idParams,
+    sensitive_params: &'a Argon2idParams,
+    slots: &'a [KeySlot],
+    slot_salts: &'a [Vec<u8>],
+}
+
+/// Compute the keyed MAC over the authenticated header subset.
+///
+/// Derives a MAC key from the master key via BLAKE3-KDF (context
+/// [`HEADER_MAC_CONTEXT`]), then computes `BLAKE3-keyed(mac_key, canonical)` over
+/// the canonical authenticated header. The MAC field of `header` is ignored, so
+/// this is safe to call before setting it.
+///
+/// # Errors
+///
+/// Returns [`CryptoError::InvalidKeyMaterial`] if the master key is not 32 bytes,
+/// or [`CryptoError::VaultFormat`] if canonical serialization fails.
+pub fn compute_header_mac(
+    header: &VaultHeader,
+    master_key: &[u8],
+) -> Result<[u8; HEADER_MAC_LEN], CryptoError> {
+    if master_key.len() != MASTER_KEY_LEN {
+        return Err(CryptoError::InvalidKeyMaterial(format!(
+            "invalid master key length: {} bytes (expected {MASTER_KEY_LEN})",
+            master_key.len()
+        )));
+    }
+
+    let view = AuthenticatedHeader {
+        version: header.version,
+        slot_count: header.slot_count,
+        session_params: &header.session_params,
+        sensitive_params: &header.sensitive_params,
+        slots: &header.slots,
+        slot_salts: &header.slot_salts,
+    };
+    let mut canonical = serde_json::to_vec(&view).map_err(|e| {
+        CryptoError::VaultFormat(format!("header MAC canonicalization failed: {e}"))
+    })?;
+
+    let mut mac_key = blake3::derive_key(HEADER_MAC_CONTEXT, master_key);
+    let mac = blake3::keyed_hash(&mac_key, &canonical);
+    mac_key.zeroize();
+    canonical.zeroize();
+
+    Ok(*mac.as_bytes())
+}
+
+/// Verify a header's MAC in constant time.
+///
+/// Returns [`HeaderMacStatus::Missing`] when the header carries no MAC (legacy
+/// vault), [`HeaderMacStatus::Valid`] when it matches, and
+/// [`HeaderMacStatus::Invalid`] when it does not. The comparison uses
+/// `ring::constant_time` so a mismatch leaks no timing information.
+///
+/// # Errors
+///
+/// Returns an error only if the MAC cannot be recomputed (bad key length, etc.).
+pub fn verify_header_mac(
+    header: &VaultHeader,
+    master_key: &[u8],
+) -> Result<HeaderMacStatus, CryptoError> {
+    let Some(stored) = header.header_mac.as_deref() else {
+        return Ok(HeaderMacStatus::Missing);
+    };
+    let expected = compute_header_mac(header, master_key)?;
+    if constant_time_eq(stored, &expected) {
+        Ok(HeaderMacStatus::Valid)
+    } else {
+        Ok(HeaderMacStatus::Invalid)
+    }
+}
+
+/// Constant-time equality for MAC comparison.
+///
+/// Accumulates the XOR of every byte with no early return on a mismatching
+/// byte, so timing reveals nothing about *where* two MACs differ. The early
+/// return on a length mismatch is safe: the MAC length (32 bytes) is public.
+/// Mirrors the constant-time pattern used elsewhere in the crate (`totp.rs`).
+#[must_use]
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 // ---------------------------------------------------------------------------
@@ -138,8 +274,15 @@ pub fn serialize(
         )));
     }
 
+    // Embed a fresh MAC over the authenticated subset. Computed here (where the
+    // master key is available) so every full write — create, slot add/remove,
+    // password change, export — authenticates the header. Counter-only updates
+    // go through `rewrite_header`, which preserves this MAC unchanged.
+    let mut header = header.clone();
+    header.header_mac = Some(compute_header_mac(&header, master_key)?.to_vec());
+
     // Serialize header to JSON.
-    let header_json = serde_json::to_vec(header)
+    let header_json = serde_json::to_vec(&header)
         .map_err(|e| CryptoError::VaultFormat(format!("header serialization failed: {e}")))?;
 
     let header_len: u32 = u32::try_from(header_json.len())
@@ -557,6 +700,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![],
             slot_salts: vec![],
+            header_mac: None,
         }
     }
 
@@ -587,6 +731,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![pw_slot, bio_slot, rec_slot],
             slot_salts: vec![vec![0x01; 16], vec![], vec![0x03; 16]],
+            header_mac: None,
         }
     }
 
@@ -1055,5 +1200,86 @@ mod tests {
 
         assert_eq!(recovered.version, 0);
         assert_eq!(payload.expose(), b"v0 test");
+    }
+
+    // -- Header MAC --
+
+    #[test]
+    fn serialize_embeds_valid_header_mac() {
+        let header = test_header_with_slots();
+        let blob = serialize(&header, b"payload", &TEST_MASTER_KEY).expect("serialize");
+        let parsed = parse_header_only(&blob).expect("parse");
+        assert!(parsed.header_mac.is_some(), "serialize must embed a MAC");
+        assert_eq!(
+            verify_header_mac(&parsed, &TEST_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Valid
+        );
+    }
+
+    #[test]
+    fn header_mac_missing_for_legacy_header() {
+        let header = test_header_with_slots(); // header_mac: None
+        assert_eq!(
+            verify_header_mac(&header, &TEST_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Missing
+        );
+    }
+
+    #[test]
+    fn header_mac_detects_param_tampering() {
+        let header = test_header_with_slots();
+        let blob = serialize(&header, b"payload", &TEST_MASTER_KEY).expect("serialize");
+        let mut parsed = parse_header_only(&blob).expect("parse");
+        // Tamper with sensitive_params (not exercised by a password-slot unwrap).
+        parsed.sensitive_params.t_cost = parsed.sensitive_params.t_cost.wrapping_add(1);
+        assert_eq!(
+            verify_header_mac(&parsed, &TEST_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Invalid
+        );
+    }
+
+    #[test]
+    fn header_mac_detects_slot_tampering() {
+        let header = test_header_with_slots();
+        let blob = serialize(&header, b"payload", &TEST_MASTER_KEY).expect("serialize");
+        let mut parsed = parse_header_only(&blob).expect("parse");
+        if let Some(slot) = parsed.slots.last_mut() {
+            if let Some(byte) = slot.wrapped_key.ciphertext.first_mut() {
+                *byte ^= 0xFF;
+            }
+        }
+        assert_eq!(
+            verify_header_mac(&parsed, &TEST_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Invalid
+        );
+    }
+
+    #[test]
+    fn header_mac_wrong_key_is_invalid() {
+        let header = test_header_with_slots();
+        let blob = serialize(&header, b"payload", &TEST_MASTER_KEY).expect("serialize");
+        let parsed = parse_header_only(&blob).expect("parse");
+        assert_eq!(
+            verify_header_mac(&parsed, &WRONG_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Invalid
+        );
+    }
+
+    #[test]
+    fn header_mac_stable_across_counter_updates() {
+        // Counter updates go through rewrite_header (no key) and must NOT
+        // invalidate the MAC, since the authenticated subset is unchanged.
+        let header = test_header_with_slots();
+        let blob = serialize(&header, b"payload", &TEST_MASTER_KEY).expect("serialize");
+        let mut parsed = parse_header_only(&blob).expect("parse");
+        parsed.unlock_attempts = 5;
+        parsed.last_attempt_at = Some(123_456);
+        parsed.total_unlock_count = 9;
+        let rewritten = rewrite_header(&blob, &parsed).expect("rewrite");
+        let reparsed = parse_header_only(&rewritten).expect("parse");
+        assert_eq!(
+            verify_header_mac(&reparsed, &TEST_MASTER_KEY).expect("verify"),
+            HeaderMacStatus::Valid
+        );
     }
 }

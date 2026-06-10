@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 
 use crate::platform::clipboard::ClipboardTimerState;
 use crate::state::{
@@ -77,6 +77,11 @@ pub async fn unlock_vault(
 
     let result = tauri::async_runtime::spawn_blocking(move || {
         let vault_path = PathBuf::from(&vault_dir);
+
+        // Wipe the plaintext password's heap buffer on every exit path from this
+        // closure — `String::drop` does NOT zero it (F3). Tauri's own IPC
+        // deserialization buffers stay out of reach (documented A6 residual).
+        let password = Zeroizing::new(password);
 
         let req = verrou_vault::UnlockVaultRequest {
             password: password.as_bytes(),
@@ -345,7 +350,9 @@ pub async fn change_password_after_recovery(
     preset: String,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<PasswordChangeResponse, String> {
-    let mut master_key_copy = [0u8; 32];
+    // `Zeroizing<[u8; 32]>` is not `Copy`, so it is *moved* into the closure
+    // (no stale copy left on this frame) and wiped on drop on every exit path.
+    let mut master_key_copy = Zeroizing::new([0u8; 32]);
     {
         let state = vault_state
             .lock()
@@ -358,6 +365,9 @@ pub async fn change_password_after_recovery(
     }
 
     tauri::async_runtime::spawn_blocking(move || {
+        // Wipe the inbound password on every exit path (F3).
+        let new_password = Zeroizing::new(new_password);
+
         let kdf_preset = match preset.as_str() {
             "fast" => verrou_crypto_core::kdf::KdfPreset::Fast,
             "maximum" => verrou_crypto_core::kdf::KdfPreset::Maximum,
@@ -371,7 +381,7 @@ pub async fn change_password_after_recovery(
         let req = verrou_vault::ChangePasswordAfterRecoveryRequest {
             new_password: new_password.as_bytes(),
             vault_dir: &vault_path,
-            master_key: &master_key_copy,
+            master_key: &master_key_copy[..],
             calibrated: &calibrated,
             preset: kdf_preset,
         };
@@ -379,7 +389,7 @@ pub async fn change_password_after_recovery(
         let result = verrou_vault::change_password_after_recovery(&req)
             .map_err(|e| format!("Password change failed: {e}"))?;
 
-        master_key_copy.zeroize();
+        // master_key_copy + new_password are zeroized on drop (Zeroizing).
 
         Ok(PasswordChangeResponse {
             formatted_key: result.recovery_key.formatted_key,
@@ -410,7 +420,9 @@ pub async fn change_master_password(
     vault_dir: String,
     vault_state: State<'_, ManagedVaultState>,
 ) -> Result<PasswordChangeResponse, String> {
-    let mut master_key_copy = [0u8; 32];
+    // `Zeroizing<[u8; 32]>` is not `Copy`, so it is *moved* into the closure
+    // (no stale copy left on this frame) and wiped on drop on every exit path.
+    let mut master_key_copy = Zeroizing::new([0u8; 32]);
     {
         let state = vault_state
             .lock()
@@ -423,6 +435,10 @@ pub async fn change_master_password(
     }
 
     tauri::async_runtime::spawn_blocking(move || {
+        // Wipe the inbound passwords on every exit path (F3).
+        let old_password = Zeroizing::new(old_password);
+        let new_password = Zeroizing::new(new_password);
+
         let kdf_preset = match preset.as_str() {
             "fast" => verrou_crypto_core::kdf::KdfPreset::Fast,
             "maximum" => verrou_crypto_core::kdf::KdfPreset::Maximum,
@@ -437,7 +453,7 @@ pub async fn change_master_password(
             old_password: old_password.as_bytes(),
             new_password: new_password.as_bytes(),
             vault_dir: &vault_path,
-            master_key: &master_key_copy,
+            master_key: &master_key_copy[..],
             calibrated: &calibrated,
             preset: kdf_preset,
         };
@@ -471,15 +487,9 @@ pub async fn change_master_password(
             }
         };
 
-        // Zeroize happens automatically when owned Strings are dropped,
-        // but explicit zeroize for the master key copy.
-        // (old_password, new_password are moved into this closure and dropped here)
-        let _ = &master_key_copy; // ensure not optimized away before zeroize
-        // master_key_copy is a stack [u8; 32] — will be zeroed on drop in debug,
-        // but explicit zeroize for release builds.
-        let mut mk = master_key_copy;
-        mk.zeroize();
-
+        // old_password, new_password and master_key_copy are all `Zeroizing`,
+        // so their buffers are wiped on drop here — on success and on every
+        // early-return error path above.
         Ok(PasswordChangeResponse {
             formatted_key: result.recovery_key.formatted_key,
             vault_fingerprint: result.recovery_key.vault_fingerprint,

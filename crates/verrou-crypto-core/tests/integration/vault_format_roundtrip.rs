@@ -40,6 +40,7 @@ fn realistic_header(slots: Vec<verrou_crypto_core::slots::KeySlot>) -> VaultHead
         total_unlock_count: 0,
         slots,
         slot_salts: vec![vec![]; salt_count],
+        header_mac: None,
     }
 }
 
@@ -116,6 +117,7 @@ fn kdf_params_survive_roundtrip() {
         total_unlock_count: 0,
         slots: vec![],
         slot_salts: vec![],
+        header_mac: None,
     };
 
     let blob = serialize(&header, b"test", &master_key).expect("serialize");

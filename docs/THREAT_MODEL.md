@@ -48,7 +48,11 @@ computer.
 ### A3 — Tampering with stored data or backups
 - **Defense:** AES-256-GCM tags and SQLCipher per-page HMAC detect at-rest
   modification; `.verrou` exports are signed (hybrid) and verified **fail-closed
-  before any decryption**. Vault integrity is checked on unlock.
+  before any decryption**. The vault header (KDF params, slots, salts) carries a
+  **master-key-derived BLAKE3 MAC**, verified fail-closed on unlock, so tampering
+  with metadata not exercised by the password-slot unwrap (e.g. `sensitive_params`
+  or another slot) is detected rather than silently accepted. Vault integrity is
+  checked on unlock.
 
 ### A4 — Brute-force / online guessing of the master password
 - **Defense:** memory-hard Argon2id + rate-limited unlock attempts with

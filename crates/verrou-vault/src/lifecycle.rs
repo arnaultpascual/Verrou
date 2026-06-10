@@ -368,6 +368,7 @@ pub fn create_vault(req: &CreateVaultRequest<'_>) -> Result<CreateVaultResult, V
         total_unlock_count: 0,
         slots: vec![password_slot.clone()],
         slot_salts: vec![salt.to_vec()],
+        header_mac: None,
     };
 
     // AC #1 step 5: Serialize .verrou file (empty payload — entries in SQLCipher).
@@ -506,6 +507,24 @@ pub fn unlock_vault(req: &UnlockVaultRequest<'_>) -> Result<UnlockVaultSession, 
     mk_arr.copy_from_slice(master_key_buf.expose());
     let master_key = SecretBytes::<32>::new(mk_arr);
     mk_arr.zeroize();
+
+    // Step 5b: Verify the header MAC now that the master key is recovered.
+    // This authenticates the KDF params and slot metadata that a normal
+    // password-slot unwrap does NOT exercise (e.g. `sensitive_params`, the
+    // recovery/biometric slots). Fail closed on a mismatch; legacy vaults with
+    // no MAC adopt one on first unlock (trust-on-first-use), persisted in step 7.
+    match vault_format::verify_header_mac(&header, master_key.expose())? {
+        vault_format::HeaderMacStatus::Valid => {}
+        vault_format::HeaderMacStatus::Missing => {
+            header.header_mac =
+                Some(vault_format::compute_header_mac(&header, master_key.expose())?.to_vec());
+        }
+        vault_format::HeaderMacStatus::Invalid => {
+            return Err(VaultError::IntegrityFailure(
+                "vault header failed integrity verification".into(),
+            ));
+        }
+    }
 
     // Step 6: Open SQLCipher database.
     let db = VaultDb::open(&db_path, &master_key)?;
@@ -1441,6 +1460,7 @@ fn replace_password_and_recovery_slots(
         total_unlock_count: header.total_unlock_count,
         slots: updated_slots,
         slot_salts: updated_salts,
+        header_mac: None,
     };
 
     // Persist updated header.
@@ -2102,6 +2122,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![],
             slot_salts: vec![],
+            header_mac: None,
         };
         // 2 attempts → 0 delay required → always allowed.
         assert_eq!(check_cooldown(&header, 1001), None);
@@ -2127,6 +2148,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![],
             slot_salts: vec![],
+            header_mac: None,
         };
         // 5 attempts → 5s delay. At time 1001, only 1s elapsed → 4s remaining.
         let remaining = check_cooldown(&header, 1001);
@@ -2154,6 +2176,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![],
             slot_salts: vec![],
+            header_mac: None,
         };
         // 5 attempts → 5s delay. At time 1006, 6s elapsed → cooldown expired.
         assert_eq!(check_cooldown(&header, 1006), None);
@@ -2179,6 +2202,7 @@ mod tests {
             total_unlock_count: 0,
             slots: vec![],
             slot_salts: vec![],
+            header_mac: None,
         };
         // No last_attempt_at → no cooldown (can't compute elapsed).
         assert_eq!(check_cooldown(&header, 9999), None);
